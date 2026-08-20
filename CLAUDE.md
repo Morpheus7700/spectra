@@ -97,12 +97,19 @@ this file only summarises.
 
 | Trigger | Agent |
 |---|---|
+| **A whole phase or milestone** | `delivery-lead` — orchestrator; spawns and sequences the rest |
 | Any accuracy claim, propagation model, or figure in metres | `rf-physicist` — **consult before publishing any number** |
 | Solver, filters, calibration, `packages/engine` | `positioning-engineer` |
-| R3F scene, shaders, PWA, frame budget | `threed-viz-engineer` |
-| Auth, tenancy, API, deployment, scale | `enterprise-architect` |
+| R3F scene, shaders, instancing, frame budget | `threed-viz-engineer` |
+| `apps/web` outside the scene — types, state, PWA, panels | `frontend-engineer` |
+| `apps/api` — routes, WebSocket contract, wire DTOs, ports | `api-engineer` |
+| `adapters/` — vendor clients, hashing, collection policy | `adapter-engineer` |
+| CI, Docker, Helm, locking, secret scanning | `devops-engineer` |
+| Auth, tenancy, data model, scale | `enterprise-architect` |
 | MAC/retention/audit/tenant isolation, and before any release | `security-privacy-auditor` |
 | Tests, fixtures, the accuracy gate | `test-engineer` |
+| **Is the suite actually catching anything?** | `mutation-tester` — standing adversary |
+| **Stuck twice, or a version/licence/API fact matters** | `web-researcher` — never guess from recall |
 | Contested, expensive-to-reverse decisions | `council-chair` → writes `docs/adr/` |
 
 **R21 — Parallelise independent work.** Two or more tasks with no shared state go out
@@ -136,12 +143,15 @@ with `np.asarray` at the boundary. Type checking caught this; the tests did not.
 ## Commands
 
 ```bash
-.venv/Scripts/python.exe -m pytest -q                  # full suite (148 tests)
-.venv/Scripts/python.exe -m ruff check packages tools  # lint
-.venv/Scripts/python.exe -m mypy packages tools        # types (strict on source)
-.venv/Scripts/python.exe -m tools.council "<q>" --adr "<slug>"
-uv pip install <pkg>                                   # venv at .venv/
+uv run pytest -q                                 # full suite
+uv run ruff check packages tools .claude/hooks   # lint
+uv run mypy packages tools .claude/hooks         # types (strict on source, tests exempt)
+uv run python -m tools.council "<q>" --adr "<slug>"
 ```
+
+`uv run` deliberately, not `.venv/Scripts/python.exe` — the latter does not exist on Linux,
+and the documented command must be the same string CI runs. Test counts are not recorded
+here; a number baked into prose goes stale silently. Read it from the suite.
 
 ## Status
 
