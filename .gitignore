@@ -1,0 +1,47 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+.envrc
+*.env
+*.key
+*.pem
+secrets/
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+.vite/
+dist-ssr/
+*.local
+
+# Data — datasets are large and licence-restricted
+data/raw/
+data/cache/
+*.h5
+*.pkl
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Council transcripts may quote proprietary design discussion
+tools/council/transcripts/
+
+# Property-test databases can serialise input data
+.hypothesis/

@@ -1,0 +1,32 @@
+[project]
+name = "spectra"
+version = "0.1.0"
+description = "WiFi 3D spatial awareness platform"
+requires-python = ">=3.13"
+dependencies = [
+    "pydantic>=2.9",
+    "numpy>=2.0",
+    "scipy>=1.14",
+    "scikit-learn>=1.5",
+]
+
+[dependency-groups]
+dev = ["pytest>=8", "hypothesis>=6", "ruff>=0.6", "mypy>=1.11"]
+
+[tool.pytest.ini_options]
+pythonpath = ["packages/core", "packages/engine", "packages/sim", "."]
+testpaths = ["packages", "tools", ".claude/hooks"]
+filterwarnings = ["error"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+mypy_path = "packages/core:packages/engine:packages/sim:.claude/hooks"
+exclude = ['/tests/', 'test_.*\.py$']
