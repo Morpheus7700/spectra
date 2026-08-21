@@ -171,6 +171,22 @@ renderer has no geometry left to invent.
 
 ## Standing findings
 
+- **WebGL screenshots are unreliable through the Chrome extension.** Three consecutive
+  captures came back pure black with zero console errors while the app was working
+  perfectly — the DOM had every element; the canvas simply had not presented a frame yet.
+  Any Playwright or agent-browser check that asserts on a screenshot needs an explicit
+  frame-wait, or it will produce phantom failures. Confirm liveness by reading the DOM
+  first, and never conclude "the scene is broken" from a black frame alone. (Separate
+  from, and additional to, the known WebGPU capture failure on Windows.)
+- **Verify from a clean `uv sync --locked` clone, not the local `.venv`.** Three
+  dependencies were installed here and declared nowhere, so the documented mypy command
+  passed only on this machine. The environment that is lying is the one you are standing
+  in.
+- **Pin `@types/*` from the registry, never from memory.** `@types/react-dom@19.2.7` does
+  not exist; the install failed. Version recall is wrong often enough that `web-researcher`
+  exists for exactly this.
+
+
 - **ADR 0001 — floor determination:** separate classifier, not a head on the x/y regressor.
 - **BSSID-membership floor vote works at 100%** with no ML. Weight by *linear power*, not dBm —
   summing logarithms is meaningless. Any learned classifier must beat this control to ship.
