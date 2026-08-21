@@ -11,7 +11,20 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8", "hypothesis>=6", "ruff>=0.6", "mypy>=1.11"]
+dev = [
+    "pytest>=8",
+    "hypothesis>=6",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    # Type-checked but previously undeclared. mypy checks tools/council/seats.py, which
+    # imports both SDKs, and multilateration.py, which needs scipy stubs. They were
+    # present in one developer's .venv and in neither pyproject.toml nor uv.lock, so
+    # `uv run mypy` was red on every other machine including CI. Declared here rather
+    # than as runtime deps because the council is build-time tooling only (R19).
+    "openai>=3.3",
+    "google-genai>=2.19",
+    "scipy-stubs>=1.18",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["packages/core", "packages/engine", "packages/sim", "."]

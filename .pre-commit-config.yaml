@@ -1,0 +1,64 @@
+# Local commit-time guards — the control that runs on a human's `git commit`.
+#
+# `.claude/hooks/guard_secrets.py` is a Claude Code PreToolUse hook: it constrains what the
+# AI writes and nothing else. It cannot see a terminal, and CI cannot help either — a key
+# that reaches a pushed commit is a rotated key, not a reverted one. This file is the only
+# guard that sits between a human keystroke and the object store.
+#
+#   pipx install pre-commit  (or: uv tool install pre-commit)
+#   pre-commit install
+#
+# BUDGET: the whole run stays under two seconds, measured. That is a design constraint, not
+# an accident. Nothing slow may move in here:
+#   - pytest is deliberately absent. It is 6.6 s today and heads for ~25 s as the accuracy
+#     gate expands. A hook that punishes committing teaches `--no-verify`, and a bypassed
+#     hook protects less than no hook at all. The suite belongs in CI, where waiting is free.
+#   - `ruff format` is deliberately absent. This codebase keeps a compact hand-maintained
+#     style (several fields per line in constructor calls); reformatting now would rewrite
+#     git blame across every file and catch no defect.
+#
+# Revisions verified against upstream releases on 2026-08-21. ruff is pinned to the exact
+# version uv.lock resolves, so the hook and CI cannot disagree about what counts as an error.
+
+repos:
+  # Secrets first: if this fires, nothing else about the commit matters.
+  # Scans the staged diff only, so a gitignored .env full of live keys is never read.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.4 # == ruff in uv.lock
+    hooks:
+      - id: ruff-check
+        args: [--fix, --exit-non-zero-on-fix]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      # .gitattributes (`* text=auto eol=lf`) already normalises what git stores; this keeps
+      # the working tree agreeing with it, which is what shebangs and the JSON fixtures see.
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+# mypy is omitted, and the reason is a defect rather than a preference. The mirrors-mypy hook
+# is unusable here — it would need pydantic/numpy/scipy re-pinned as additional_dependencies,
+# a second dependency list drifting silently from uv.lock, and still would not reproduce the
+# mypy_path in pyproject.toml. A local hook calling the project env is the right shape and runs
+# in 0.74 s, but it is red on any machine that is not this laptop: openai, google-genai and
+# scipy-stubs are installed in .venv and declared nowhere, so `uv run mypy` on a fresh `uv sync`
+# reports 3 import errors. A hook that fails for reasons unrelated to your commit is how
+# `--no-verify` becomes muscle memory. Once those three are declared in pyproject.toml, add:
+#
+#   - repo: local
+#     hooks:
+#       - id: mypy
+#         name: mypy (strict, project env)
+#         entry: uv run mypy packages tools .claude/hooks
+#         language: system
+#         types: [python]
+#         pass_filenames: false
+#         require_serial: true

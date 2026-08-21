@@ -1,0 +1,35 @@
+# Editor settings, so a fresh clone on any machine writes the bytes this repo already stores.
+# Companion to .gitattributes (`* text=auto eol=lf`), which normalises at the git layer:
+# .gitattributes fixes what is committed, this fixes what the editor types.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+# == ruff line-length in pyproject.toml
+max_line_length = 100
+
+[*.{py,pyi}]
+indent_size = 4
+
+[*.md]
+# Two trailing spaces are a hard line break in markdown; stripping them edits the prose.
+trim_trailing_whitespace = false
+
+# Windows-native scripts keep CRLF or cmd.exe mis-parses them — mirrors .gitattributes.
+[*.{bat,cmd,ps1}]
+end_of_line = crlf
+
+[{Makefile,*.mk}]
+indent_style = tab
+
+# Generated. Reformatting it produces a diff nobody can review.
+[uv.lock]
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+max_line_length = unset
