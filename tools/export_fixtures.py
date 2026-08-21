@@ -95,8 +95,17 @@ def main() -> int:
     target = OUT_DIR / "site.json"
     # sort_keys and a trailing newline so the CI freshness check diffs cleanly rather
     # than churning on dict ordering.
+    #
+    # newline="\n" is load-bearing, not decoration: Path.write_text defaults to
+    # newline=None, which translates every \n to os.linesep, so this same generator
+    # emitted CRLF on Windows and LF on Linux. .gitattributes normalises that away
+    # inside `git diff`, which is precisely what makes it easy to miss — the freshness
+    # gate stays green while the bytes that the vitest fixture and the Playwright golden
+    # actually read differ between the two platforms.
     target.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+        newline="\n",
     )
 
     print(

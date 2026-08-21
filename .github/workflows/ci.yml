@@ -68,6 +68,23 @@ jobs:
       - name: Types (mypy)
         run: uv run mypy packages tools .claude/hooks
 
+      # Both tools/export_fixtures.py and apps/web/src/scene/SiteScene.tsx tell
+      # the reader that "CI regenerates it and fails on any diff". Until now
+      # nothing did, so the one guarantee that keeps the web fixture from
+      # drifting away from the Python domain models was documentation. This is
+      # that check, and it runs on BOTH legs of the matrix on purpose: the
+      # exporter writes the file, and "the same generator produces different
+      # bytes on Windows" is precisely this project's recurring bug class.
+      - name: Fixture freshness (site.json still matches the domain models)
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run python -m tools.export_fixtures
+          if ! git --no-pager diff --exit-code apps/web/public/fixtures; then
+            echo "::error file=apps/web/public/fixtures/site.json::Fixture is stale. Regenerate with 'uv run python -m tools.export_fixtures' and commit the result."
+            exit 1
+          fi
+
       - name: Tests (excluding accuracy)
         run: uv run pytest -q -m "not accuracy"
 
@@ -125,3 +142,117 @@ jobs:
             exit 0
           fi
           exit "$status"
+
+  # ---------------------------------------------------------------------------
+  # Secret scanning, server-side.
+  #
+  # Until now the only secret scanning was `.pre-commit-config.yaml` (staged diff)
+  # and `.claude/hooks/guard_secrets.py` (what Claude writes). Neither survives
+  # `git commit --no-verify`, and neither runs on a push from a machine where the
+  # hooks were never installed. This job is the only control that sees what
+  # actually reached the remote — and it is the one control where being late is
+  # unrecoverable: a key in a pushed commit is a rotated key, not a reverted one.
+  #
+  # Pinned to v8.30.1, the same revision as the pre-commit hook, so the local and
+  # server checks cannot disagree about what counts as a leak. Installed from the
+  # release tarball against its published SHA-256 rather than via
+  # gitleaks/gitleaks-action, which requires a paid GITLEAKS_LICENSE for repos
+  # owned by an organisation — i.e. it would fail on the day this repo moves off
+  # a personal account, for reasons unrelated to any commit.
+  #
+  # `gitleaks git` reads commits (`git log -p`) and never the working tree, so a
+  # gitignored .env full of live keys is not read. Verified, not assumed.
+  # `--redact` keeps every matched value out of the log; `-v` still prints rule,
+  # file, line and commit, which is what you need in order to rotate the key and
+  # rewrite history (R19).
+  # ---------------------------------------------------------------------------
+  secrets:
+    name: secret scan (gitleaks, full history)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      # fetch-depth: 0 — a key introduced three commits ago is still live. The
+      # default shallow checkout would scan only the tip and report clean.
+      - name: Checkout (full history)
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks 8.30.1 (== .pre-commit-config.yaml)
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -sSfL -o "$RUNNER_TEMP/gitleaks.tar.gz" \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $RUNNER_TEMP/gitleaks.tar.gz" \
+            | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" version
+
+      # Exits 1 on any finding. ~0.2 s over the whole history today.
+      - name: Scan commit history
+        run: "$RUNNER_TEMP/gitleaks git --redact -v --no-banner ."
+
+  # ---------------------------------------------------------------------------
+  # Web build. Ubuntu only, deliberately.
+  #
+  # The Python matrix is dual-OS because that split is this project's recurring
+  # bug (path separators, line endings) and because the engine has to run on
+  # both. Nothing in this job is OS-shaped: npm resolves the same tracked
+  # package-lock.json everywhere, tsc and vite are platform-agnostic, and the
+  # artifact that actually ships is built on Linux. A Windows leg would double
+  # the minutes to re-test node's own portability, which is not our defect to
+  # find. It is a separate job rather than steps in `check` for the same reason:
+  # it shares no state with the Python work, needs no uv sync, and a red web
+  # build should not hide behind a Python matrix name.
+  # ---------------------------------------------------------------------------
+  web:
+    name: web build (node 22)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      # Pinned to the exact version on the development machine, so a failure here
+      # reproduces locally instead of becoming "works on my node". Both declared
+      # engine ranges are satisfied: vite 8 wants ^20.19 || >=22.12, vitest 4
+      # wants ^20 || ^22 || >=24 — note the hole at 23, which is why `lts/*` or
+      # `latest` would be a live trap here rather than a convenience.
+      - name: Install node
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: "22.19.0"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      # ci, not install: it installs the lockfile exactly and fails if
+      # package.json and package-lock.json have drifted. The npm analogue of
+      # `uv sync --locked` above.
+      - name: Install dependencies (fails if package-lock.json is stale)
+        run: npm ci
+
+      # Same cost ordering as the Python job: types before tests before build.
+      - name: Types (tsc --noEmit)
+        run: npm run typecheck
+
+      # `npm test` is `vitest run`, and there are zero test files today, in which
+      # case vitest exits 1 with "No test files found". --passWithNoTests is
+      # vitest's own flag for exactly that case: it changes the exit code of an
+      # EMPTY run and nothing else, so a failing test still fails this job. That
+      # is the difference between it and `|| true`, which would swallow real
+      # failures silently.
+      #
+      # The flag goes inert the moment the first *.test.ts lands — this step
+      # starts gating with no edit to this file. If you want "somebody deleted
+      # every test" to be a red build, delete the flag once tests exist.
+      - name: Tests (vitest)
+        run: npm test -- --passWithNoTests
+
+      - name: Build (tsc -b && vite build)
+        run: npm run build

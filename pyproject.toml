@@ -30,6 +30,15 @@ dev = [
 pythonpath = ["packages/core", "packages/engine", "packages/sim", "."]
 testpaths = ["packages", "tools", ".claude/hooks"]
 filterwarnings = ["error"]
+# Registered here and applied in the same change, deliberately: filterwarnings = ["error"]
+# turns PytestUnknownMarkWarning into a hard failure, so a marker applied before it is
+# registered reds the suite. CI runs `-m "not accuracy"` and `-m accuracy` as separate
+# steps; before this marker existed the second step collected nothing and exited 5, which
+# both workflows reported as "PASS (vacuous)" -- an honest name for a gate protecting
+# nothing. The gate itself was running all along, inside the "not accuracy" step.
+markers = [
+    "accuracy: the numerical regression gate -- slow (~18s), seeded, and the only tests whose thresholds are claims about how wrong the engine is",
+]
 
 [tool.ruff]
 line-length = 100

@@ -1,7 +1,7 @@
 """Tests for ranging, floor classification, zone resolution, and the pipeline.
 
-Plus the accuracy regression gate, which is the point of the whole exercise: it turns
-"is it accurate?" from an opinion into a build failure.
+Fast behavioural tests only. The accuracy regression gate -- the seeded, slow, marked
+suite whose thresholds are published claims -- lives in test_accuracy_gate.py.
 """
 
 from __future__ import annotations
@@ -11,13 +11,11 @@ from datetime import UTC, datetime
 
 import pytest
 from spectra_core.models import ObservationEvent, SolutionKind
-from spectra_engine.accuracy import calibrate_from_truth, evaluate
 from spectra_engine.floor import classify_floor
-from spectra_engine.pipeline import PipelineConfig, _slant_to_horizontal, estimate_position
+from spectra_engine.pipeline import _slant_to_horizontal, estimate_position
 from spectra_engine.ranging import CalibrationError, PathLossModel, default_model, fit_path_loss
 from spectra_engine.zones import confidence_ellipse_axes, point_in_polygon, resolve_zone
 from spectra_sim.building import BuildingSpec, build_site
-from spectra_sim.scenario import office_walk
 
 NOW = datetime(2026, 1, 1, 9, 0, tzinfo=UTC)
 SITE = build_site(BuildingSpec())
@@ -217,66 +215,3 @@ def test_undecidable_floor_yields_unknown_not_a_guess():
     f1 = [ap.id for ap in SITE.access_points if ap.floor_id == "floor-1"][:3]
     est = estimate_position([obs(a, -65.0) for a in f0 + f1], SITE, NOW, "d1").estimate
     assert est.kind is SolutionKind.UNKNOWN and est.floor_id is None
-
-
-# --------------------------------------------------------------------------- the gate
-
-
-@pytest.fixture(scope="module")
-def calibrated_runs():
-    runs = []
-    for seed in (0, 1, 2):
-        scenario = office_walk(seed=seed)
-        paired = scenario.paired()
-        models = calibrate_from_truth(paired, scenario.site)
-        runs.append(
-            evaluate(paired, scenario.site, scenario.target_id, PipelineConfig(models=models))
-        )
-    return runs
-
-
-def test_accuracy_gate_p50(calibrated_runs):
-    """Median horizontal error must stay below 3.5 m. Observed ~1.7-2.6 m."""
-    for report in calibrated_runs:
-        assert report.p50 < 3.5, report.summary()
-
-
-def test_accuracy_gate_p95(calibrated_runs):
-    """The tail is what users feel, so it is gated separately. Observed ~5.0-5.6 m."""
-    for report in calibrated_runs:
-        assert report.p95 < 8.0, report.summary()
-
-
-def test_accuracy_gate_coverage(calibrated_runs):
-    """An excellent p50 achieved by refusing to answer is not a result."""
-    for report in calibrated_runs:
-        assert report.coverage >= 0.95, report.summary()
-
-
-def test_accuracy_gate_floor_classification(calibrated_runs):
-    """The membership vote should be near-perfect; a drop means the vote broke."""
-    for report in calibrated_runs:
-        assert report.floor_accuracy >= 0.95, report.summary()
-        assert report.floor_decision_rate >= 0.90, report.summary()
-
-
-def test_accuracy_gate_uncertainty_is_honest(calibrated_runs):
-    """Reported sigma must match observed error.
-
-    For a 2D Gaussian the median error is ~1.18 sigma. Drifting far above 1.18 means the
-    engine is overconfident -- drawing volumes too small to contain the truth, which is
-    worse than being imprecise, because the display would be lying rather than vague.
-    """
-    for report in calibrated_runs:
-        assert 0.5 <= report.calibration_ratio <= 2.0, report.summary()
-
-
-def test_calibration_beats_no_calibration():
-    """Fitting A and n per AP must actually earn its complexity."""
-    scenario = office_walk(seed=1)
-    paired = scenario.paired()
-    models = calibrate_from_truth(paired, scenario.site)
-    naive = evaluate(paired, scenario.site, scenario.target_id, PipelineConfig())
-    fitted = evaluate(paired, scenario.site, scenario.target_id, PipelineConfig(models=models))
-    assert fitted.p95 < naive.p95
-    assert fitted.coverage >= naive.coverage
