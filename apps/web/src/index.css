@@ -1,0 +1,15 @@
+:root {
+  color-scheme: dark;
+  --bg: #0b0d10;
+  --fg: #e6e8eb;
+  --muted: #8b939e;
+}
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  overscroll-behavior: none;
+}
+canvas { display: block; touch-action: none; }
