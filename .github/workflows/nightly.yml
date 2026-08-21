@@ -1,0 +1,148 @@
+name: Nightly (unpinned dependencies)
+
+# WHY THIS JOB EXISTS, AND WHY IT NEVER GATES A PR
+#
+# The accuracy gate is a NUMERICAL gate, not a behavioural one. It asserts things
+# like p50/p95 error bounds, and those bounds are produced by scipy's optimiser,
+# numpy's linear algebra and scikit-learn's estimators. A scipy MINOR bump can
+# change a convergence path or a default tolerance and move p50 with zero changes
+# on our side. Nothing in our diff caused it and nothing in our diff can fix it.
+#
+# CI (ci.yml) therefore runs fully locked: contributors get a reproducible,
+# deterministic result, and a PR is never red because of somebody else's release.
+# This job is the counterweight — it resolves dependencies FRESH, ignoring
+# uv.lock, so upstream breakage surfaces on our schedule, in a job nobody is
+# waiting on, instead of during a release when somebody finally runs `uv lock`.
+#
+# Consequently every step is continue-on-error. This job reports; it does not
+# block. If it goes red, the response is to investigate and pin deliberately,
+# never to "fix the build".
+
+on:
+  schedule:
+    # 03:17 UTC daily. Deliberately off the hour — GitHub throttles the many
+    # workflows everyone schedules at :00, which delays runs unpredictably.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  unpinned:
+    name: unpinned resolve + full suite
+    # Linux only: this is the deploy target, and the question being asked is
+    # "did upstream move?", which is not OS-specific. Windows coverage is CI's job.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: "3.13"
+          # No dependency cache. A cached resolution is the exact thing this job
+          # is trying not to do.
+          enable-cache: false
+
+      # `uv lock --upgrade` re-resolves every dependency to the newest version
+      # allowed by pyproject.toml, discarding the pinned versions in uv.lock.
+      # This rewrites uv.lock in the runner's checkout only — nothing is
+      # committed and the repository is untouched.
+      - name: Re-resolve dependencies, ignoring uv.lock
+        continue-on-error: true
+        run: uv lock --upgrade
+
+      - name: Install freshly resolved dependencies
+        continue-on-error: true
+        run: uv sync
+
+      - name: Record resolved versions
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -uo pipefail
+          {
+            echo "## Resolved dependency versions"
+            echo
+            echo "Fresh resolution at $(date -u '+%Y-%m-%d %H:%M UTC'), ignoring the committed uv.lock."
+            echo
+            echo '```'
+            uv pip list 2>&1 || echo "(uv pip list failed)"
+            echo '```'
+            echo
+            echo "### uv.lock drift vs the committed lockfile"
+            echo
+            echo '```diff'
+            git --no-pager diff --stat -- uv.lock 2>&1 || true
+            git --no-pager diff -- uv.lock 2>&1 | head -n 200 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Lint (ruff)
+        continue-on-error: true
+        run: uv run ruff check packages tools .claude/hooks
+
+      - name: Types (mypy)
+        continue-on-error: true
+        run: uv run mypy packages tools .claude/hooks
+
+      - name: Tests (excluding accuracy)
+        continue-on-error: true
+        run: uv run pytest -q -m "not accuracy"
+
+      # Same exit-5 tolerance as ci.yml: the `accuracy` marker is still being
+      # added. This is the step the whole job is really for — see the header.
+      - name: Accuracy gate (numerical drift check)
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          set +e
+          uv run pytest -q -m accuracy 2>&1 | tee accuracy-output.txt
+          status=${PIPESTATUS[0]}
+          set -e
+
+          {
+            echo "## Accuracy gate — unpinned dependencies"
+            echo
+            case "$status" in
+              0)
+                echo "**PASS** — accuracy bounds hold against freshly resolved dependencies."
+                echo "No upstream numerical drift detected today."
+                ;;
+              5)
+                echo "**PASS (vacuous)** — pytest exited 5: no tests matched \`-m accuracy\`."
+                echo
+                echo "The \`accuracy\` marker is not defined yet, so this run proves nothing"
+                echo "about numerical drift. It becomes meaningful when the marker lands."
+                ;;
+              *)
+                echo "**FAIL** — pytest exited $status against freshly resolved dependencies."
+                echo
+                echo "This did NOT break a PR and does not need a hotfix. Compare the"
+                echo "resolved versions above against uv.lock, identify what moved, and"
+                echo "decide whether to pin it or accept the new numbers (R14: quote p50,"
+                echo "p95, max AND coverage when deciding — not a single figure)."
+                ;;
+            esac
+            echo
+            echo "<details><summary>pytest output</summary>"
+            echo
+            echo '```'
+            cat accuracy-output.txt
+            echo '```'
+            echo
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Reported, never gating. The step summary above is the deliverable.
+          exit 0

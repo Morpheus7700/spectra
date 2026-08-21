@@ -45,3 +45,6 @@ tools/council/transcripts/
 
 # Property-test databases can serialise input data
 .hypothesis/
+
+# CI scratch
+accuracy-output.txt

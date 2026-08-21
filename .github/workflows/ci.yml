@@ -1,0 +1,127 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A superseded PR run tells us nothing. Cancel it; never cancel main.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  check:
+    name: check (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      # Do not stop the Windows leg because Linux failed, or vice versa.
+      # Dev is Windows, deploy is Linux; when they disagree we need both reports.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.13"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      # --locked, not --frozen. `uv sync --help` (uv 0.7.20) is explicit:
+      #   --locked  "Assert that the `uv.lock` will remain unchanged"
+      #   --frozen  "Sync without updating the `uv.lock` file"
+      # --frozen installs the lock as-is and stays SILENT when pyproject.toml has
+      # drifted past it. --locked is the flag that fails loudly on a stale lock,
+      # which is the behaviour this gate is here for. Both refuse to rewrite the
+      # lockfile, so --locked is strictly the stronger choice.
+      - name: Install dependencies (fails if uv.lock is stale)
+        run: uv sync --locked
+
+      # ---------------------------------------------------------------------
+      # Steps below are ordered by COST, cheapest first, so the fastest check
+      # that can fail is the one that fails. Measured on this project:
+      # ruff ~0.1s, mypy ~0.7s, then the suites.
+      #
+      # DO NOT MOVE mypy BELOW THE TESTS.
+      # That ordering is not a stylistic preference. mypy caught a latent crash
+      # here that all 166 passing tests missed: scipy.least_squares can return a
+      # sparse matrix or LinearOperator for `.jac`, and an untested code path
+      # consumed it as a dense ndarray. Types found it; the suite did not.
+      # A type error on this codebase is evidence of a real defect, and it costs
+      # 0.7s to learn about it instead of several minutes.
+      # ---------------------------------------------------------------------
+
+      - name: Lint (ruff)
+        run: uv run ruff check packages tools .claude/hooks
+
+      - name: Types (mypy)
+        run: uv run mypy packages tools .claude/hooks
+
+      - name: Tests (excluding accuracy)
+        run: uv run pytest -q -m "not accuracy"
+
+      # The `accuracy` marker does not exist yet; it is being added in a separate
+      # workstream. Until it lands, `-m accuracy` collects nothing and pytest
+      # exits 5. We treat 5 as a pass so this file can merge ahead of the marker.
+      #
+      # 5 is the ONLY tolerated non-zero code. 1 (failures), 2 (interrupted),
+      # 3 (internal error) and 4 (usage error) all still fail the job, so this
+      # cannot quietly swallow a real accuracy regression.
+      #
+      # R14: the summary is written on SUCCESS as well as failure. A gate that
+      # only speaks when it is angry gets ignored, and a vacuous pass that looks
+      # identical to a real one is worse than no gate at all — so the summary
+      # states plainly which of the two happened.
+      - name: Accuracy gate
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          set +e
+          uv run pytest -q -m accuracy 2>&1 | tee accuracy-output.txt
+          status=${PIPESTATUS[0]}
+          set -e
+
+          {
+            echo "## Accuracy gate — ${{ matrix.os }} / Python ${{ matrix.python-version }}"
+            echo
+            case "$status" in
+              0)
+                echo "**PASS** — accuracy tests ran and passed."
+                ;;
+              5)
+                echo "**PASS (vacuous)** — pytest exited 5: no tests matched \`-m accuracy\`."
+                echo
+                echo "The \`accuracy\` marker is not defined yet, so this gate currently"
+                echo "protects nothing. It starts gating the moment the marker lands —"
+                echo "no workflow change required."
+                ;;
+              *)
+                echo "**FAIL** — pytest exited $status."
+                ;;
+            esac
+            echo
+            echo "<details><summary>pytest output</summary>"
+            echo
+            echo '```'
+            cat accuracy-output.txt
+            echo '```'
+            echo
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$status" -eq 0 ] || [ "$status" -eq 5 ]; then
+            exit 0
+          fi
+          exit "$status"
