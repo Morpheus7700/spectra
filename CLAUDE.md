@@ -155,12 +155,12 @@ here; a number baked into prose goes stale silently. Read it from the suite.
 
 ## Status
 
-**P0 complete.** Simulator, engine and accuracy harness built and gated. Three seeds,
+**P0 complete.** Simulator, engine and accuracy harness built and gated. 20 seeds,
 per-AP calibration fitted from a simulated survey:
 
 | | p50 | p95 | coverage | floor | zone | calibration |
 |---|---|---|---|---|---|---|
-| Calibrated | 1.7–2.6 m | 5.0–5.6 m | 100% | 100% | 81–84% | 0.93–1.37 |
+| Calibrated | 1.54–2.61 m | 4.10–6.60 m | 99–100% | 100% | 73–88% | 0.62–1.06 |
 | Uncalibrated | 2.5–4.1 m | 9.7–10.9 m | 70–92% | 100% | 53–64% | 0.31–0.64 |
 
 Subject to R13 — these describe the simulator, not a building.

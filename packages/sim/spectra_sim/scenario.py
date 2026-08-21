@@ -92,3 +92,125 @@ def office_walk(seed: int = 0, spec: BuildingSpec | None = None) -> Scenario:
         site,
         sensor,
     )
+
+
+def corridor_walk(seed: int = 0) -> Scenario:
+    """A narrow corridor with APs along the spine — triggers COLLINEAR_ANCHORS.
+
+    The building is 30 m long and only 4 m wide, with 3 APs placed in a 3x1 grid. Because
+    ap_grid_rows=1 all anchors share the same y-coordinate, making them collinear (the SVD
+    ratio test in assess_geometry sees singular[1]/singular[0] < 0.06).
+
+    This is realistic: a long hallway in a hospital or office wing with ceiling APs mounted
+    along the centreline is exactly the geometry where the solver must refuse rather than
+    produce a fix that is unconstrained perpendicular to the corridor.
+    """
+    spec = BuildingSpec(
+        width_m=30.0,
+        depth_m=4.0,
+        floors=1,
+        ap_grid_cols=3,
+        ap_grid_rows=1,
+        rooms_across=1,
+        rooms_deep=1,
+    )
+    site = build_site(spec)
+    sensor = Sensor(
+        site=site,
+        params=PropagationParams(),
+        shadowing=ShadowingField(seed=seed),
+        walls=walls_by_floor(site, spec),
+    )
+    waypoints = (
+        Waypoint(x=2.0, y=2.0, floor_id="floor-0", pause_s=3.0),
+        Waypoint(x=15.0, y=2.0, floor_id="floor-0"),
+        Waypoint(x=28.0, y=2.0, floor_id="floor-0", pause_s=3.0),
+    )
+    return run(
+        f"corridor-walk-seed{seed}",
+        Trajectory(waypoints=waypoints, start=EPOCH),
+        site,
+        sensor,
+    )
+
+
+def sparse_grid(seed: int = 0) -> Scenario:
+    """A wide floor with only 2 APs — triggers TOO_FEW_ANCHORS.
+
+    A 50 m x 50 m warehouse floor with exactly 2 access points. The solver requires a
+    minimum of 3 unique anchors (MIN_ANCHORS in multilateration.py), so every sample point
+    here produces at most 2 ranges and is refused without attempting a solve.
+
+    This is realistic: a large open warehouse with a partial AP rollout, where coverage
+    exists but positioning geometry does not.
+    """
+    spec = BuildingSpec(
+        width_m=50.0,
+        depth_m=50.0,
+        floors=1,
+        ap_grid_cols=2,
+        ap_grid_rows=1,
+        rooms_across=1,
+        rooms_deep=1,
+    )
+    site = build_site(spec)
+    sensor = Sensor(
+        site=site,
+        params=PropagationParams(),
+        shadowing=ShadowingField(seed=seed),
+        walls=walls_by_floor(site, spec),
+    )
+    waypoints = (
+        Waypoint(x=10.0, y=25.0, floor_id="floor-0", pause_s=3.0),
+        Waypoint(x=25.0, y=25.0, floor_id="floor-0"),
+        Waypoint(x=40.0, y=25.0, floor_id="floor-0", pause_s=3.0),
+    )
+    return run(
+        f"sparse-grid-seed{seed}",
+        Trajectory(waypoints=waypoints, start=EPOCH),
+        site,
+        sensor,
+    )
+
+
+def wide_open(seed: int = 0) -> Scenario:
+    """A very large floor with APs only at the corners — triggers high uncertainty.
+
+    100 m x 100 m floor with a 2x2 AP grid. Most trajectory points are far from all four
+    APs, so the RSSI ranges have large sigma and the solved fix has uncertainty exceeding
+    `max_sigma_for_point_m` (15 m default). The solver succeeds but the pipeline downgrades
+    to ZONE_ONLY because the reported sigma is too large to claim a point.
+
+    Also contains some points close enough to the APs that they get a POINT fix, so the
+    scenario produces a mix of POINT and ZONE_ONLY outcomes.
+    """
+    spec = BuildingSpec(
+        width_m=100.0,
+        depth_m=100.0,
+        floors=1,
+        ap_grid_cols=2,
+        ap_grid_rows=2,
+        rooms_across=2,
+        rooms_deep=2,
+    )
+    site = build_site(spec)
+    sensor = Sensor(
+        site=site,
+        params=PropagationParams(),
+        shadowing=ShadowingField(seed=seed),
+        walls=walls_by_floor(site, spec),
+    )
+    # Trajectory crosses far from all APs, forcing large sigma estimates.
+    waypoints = (
+        Waypoint(x=50.0, y=50.0, floor_id="floor-0", pause_s=4.0),
+        Waypoint(x=50.0, y=10.0, floor_id="floor-0"),
+        Waypoint(x=10.0, y=50.0, floor_id="floor-0"),
+        Waypoint(x=90.0, y=90.0, floor_id="floor-0", pause_s=4.0),
+    )
+    return run(
+        f"wide-open-seed{seed}",
+        Trajectory(waypoints=waypoints, start=EPOCH),
+        site,
+        sensor,
+    )
+
