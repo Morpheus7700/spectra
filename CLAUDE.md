@@ -32,10 +32,23 @@ showing its output. "Should work" is not a result.
 
 ## B. Physics — not negotiable, not designable-around
 
-**R6 — The client cannot sense.** iOS has no WiFi scanning API (`NEHotspotHelper` is
+**R6 — The *browser* cannot sense.** iOS has no WiFi scanning API (`NEHotspotHelper` is
 entitlement-gated to hotspot login and forbidden for location). Browsers have none at all.
-Architecture is therefore **infrastructure senses → server solves → client renders**. Any
-proposal where the phone or browser does the sensing is wrong on its face.
+Architecture is therefore **something senses → server solves → client renders**. Any proposal
+where the phone or browser does the sensing is wrong on its face.
+
+Amended 2026-08-26. The original wording said "the client cannot sense" and mandated that the
+sensing be *infrastructure*. That over-reached: a **native desktop collector can sense**.
+`adapters/windows_wlan/` calls `wlanapi.dll` directly and reads true dBm for every BSS in
+range. It is an adapter under R11 like any vendor client — it just happens to run on the same
+machine as the renderer. The renderer still only renders. What R6 forbids is unchanged: no
+browser, no iOS app, and no solve on the client.
+
+Two hard platform limits found while doing this, worth recording so they are not re-litigated:
+**Windows exposes no FTM/802.11mc API and Microsoft has stated no public plan to add one**, so
+RSSI is the ceiling on that platform regardless of what AP you buy; and since the fall 2024
+Windows release `WlanScan`/`WlanGetNetworkBssList` require precise-location consent and must be
+throttled, so a continuous scan loop is a product decision, not just a polling rate.
 
 **R7 — Floor is classified, never regressed.** With ceiling-mounted APs the anchors are
 coplanar, so z has no observable gradient in the range residuals. Any z we emitted would be
@@ -70,6 +83,22 @@ interface, so the engine cannot tell sim from real. Its figures prove the solver
 
 **R14 — Report distributions, not means.** p50, p95, max. Always alongside coverage: an
 excellent p50 achieved by refusing to answer is not a result.
+
+**R14a — Quote the null estimator beside every figure.** The null is "always answer the centre
+of the space", and it needs no survey, no scan and no solver. In a 70 m² flat it scores
+**p50 3.34 m, p95 5.25 m** (Monte Carlo, 400k uniform draws over 7×10 m). A number that does
+not beat it is not a result, it is an expensive constant — and the smaller the space, the
+harder the null is to beat. A figure quoted without its null is unreviewable.
+
+Two specific ways a fingerprint fakes this, both of which must be gated, not hoped about:
+- **Random train/test split.** Consecutive samples at one point land on both sides, so k-NN
+  retrieves its own neighbour from 250 ms earlier. Inflates accuracy 2–5×. **Hold out by
+  location or by a separate walk — never randomly.**
+- **Regression shrinkage.** Weighted k-NN pulls toward the training centroid; with mostly
+  uninformative features it silently *becomes* the null while reporting a respectable p50.
+  Gate it: regress predicted coordinate on true across the held-out set. Slope ≈ 1.0 is real
+  localisation; slope ≈ 0.4 means 60% of the "accuracy" is shrinkage. Report
+  `std(predicted)/std(truth)` per axis alongside; below ~0.7 you are not localising.
 
 ## D. Privacy — this is a surveillance system if built carelessly
 
@@ -163,11 +192,20 @@ per-AP calibration fitted from a simulated survey:
 | Calibrated | 1.54–2.61 m | 4.10–6.60 m | 99–100% | 100% | 73–88% | 0.62–1.06 |
 | Uncalibrated | 2.5–4.1 m | 9.7–10.9 m | 70–92% | 100% | 53–64% | 0.31–0.64 |
 
-Subject to R13 — these describe the simulator, not a building.
+Subject to R13 — these describe the simulator, not a building. **And they cannot be carried
+forward as an expectation for a different geometry.** That table came from a simulated
+multi-floor building with well-spread anchors. In a 70 m² flat the null estimator alone scores
+p50 3.34 m (R14a), so 2.61 m there would be a ~0.7 m win, not the result it looks like here.
 
-**Next: P1** — R3F viewer rendering the covariance ellipsoids, live WebSocket, PWA install.
-`confidence_ellipse_axes()` already returns semi-major, semi-minor and rotation, so the
-renderer has no geometry left to invent.
+**P0.5 was never closed.** Recorded as: accuracy gate PARTIAL · refusal paths PARTIAL · CI
+PARTIAL · domain-model changes NOT DONE. The accuracy marker and gate tests have since landed;
+the rest has not been re-verified. `docs/specs/` is advertised at the top of this file and is
+an empty directory.
+
+**Now: P1-Real** — localisation on the hardware that exists (one Windows laptop, two routers in
+one flat). The laptop is both sensor and target; it is the only thing this hardware can locate.
+Device-free sensing is permanently out here: no CSI on AX211/Windows, no FTM on Windows at all.
+See `.claude/plans/lets-get-back-to-tranquil-storm.md`.
 
 ## Standing findings
 
@@ -193,3 +231,31 @@ renderer has no geometry left to invent.
 - **Slant-range correction matters.** RSSI measures distance to a ceiling AP; the solve is in
   plan view. At 3 m horizontal with 1.7 m height difference that is a 15% overstatement biasing
   near anchors outward. It vanishes at long range, which is why it is easy to miss.
+- **`netsh wlan show networks` is a broken instrument. Never measure with it.** It reported
+  **1** access point on the dev laptop where `wlanapi.dll` reported **16**. It serves a stale,
+  filtered cache and gives signal *percentage*, not dBm, so RSSI has to be reconstructed as
+  `pct/2 - 100` — quantised to 2 dB, which is half the sigma budget of a good anchor thrown
+  away for free. An entire session's conclusions ("no neighbour networks reachable at this
+  location", and the pivot away from localisation that followed) were drawn from that artifact.
+  Use `adapters/windows_wlan/scanner.py`. A single sweep still under-reports — counts climbed
+  11 → 15 → 16 across consecutive sweeps because the radio visits channels in batches — so
+  union several.
+- **Count physical radios, not BSSIDs.** A 16-BSSID scan was ~8 devices. The 2.4/5 GHz radios
+  of one box are the same anchor; a locally-administered BSSID differing only in the LA bit of
+  the first octet is a virtual/guest BSS on the *same antenna*. Treating those as independent
+  silently double-weights that radio in any k-NN metric or solve.
+- **RSSI sigma is band-dependent and the gap is large.** Same physical router, stationary
+  laptop, 8 sweeps: **σ 0.76 dB on its uncongested 5 GHz radio vs 4.47 dB on its 2.4 GHz**.
+  Weight 5 GHz far above 2.4 GHz for in-space anchors — this inverts the "2.4 travels further
+  so it's better" instinct.
+- **σ = 0.00 at ≤ −85 dBm is a driver clamp, not stability.** Exactly-repeated floor values.
+  Worse, those APs sit 1–5 dB above the detection cliff, so they are only *seen* on sweeps
+  where fading helped — truncation that biases the mean upward by 1.4–4.8 dB and shortens
+  fitted range by 10–31%. The bias is deterministic, so averaging never removes it and a robust
+  loss never catches it. Binary seen/not-seen only; never a continuous feature, never an anchor.
+- **Prefer differential features (RSSI_i − RSSI_j) to raw dBm.** Cancels common-mode NIC gain
+  drift, laptop lid angle, and part of body shadowing. Costs nothing.
+- **Body orientation is not a second-order effect.** 3–6 dB typical shadowing, 10–20 dB worst
+  case, worse at 5 GHz. On an anchor at 6 m (gradient ~2.2 dB/m) that is **2.3 m of apparent
+  position shift from turning around**. Four orientations per survey point is the defensible
+  minimum, and the test set must contain orientations and days the training set does not.

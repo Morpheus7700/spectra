@@ -26,11 +26,20 @@ node_modules/
 .vite/
 dist-ssr/
 *.local
+*.tsbuildinfo
 
 # Data — datasets are large and licence-restricted
 data/raw/
 data/cache/
 *.h5
+
+# Real-world captures are personal data (R16) and must never be committed.
+# A survey records every neighbouring BSSID -- geolocatable via public wardriving
+# databases -- and SSIDs routinely carry people's names. site.json for a real home
+# is that home's floor plan. Simulator fixtures under apps/web/public/fixtures/ are
+# generated and carry no identifiers; those stay tracked.
+data/flat/
+*.survey.jsonl
 *.pkl
 
 # OS / editor
