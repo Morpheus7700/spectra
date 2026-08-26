@@ -65,7 +65,7 @@ repos:
     hooks:
       - id: mypy
         name: mypy (strict, project env)
-        entry: uv run mypy packages tools .claude/hooks
+        entry: uv run mypy packages tools adapters .claude/hooks
         language: system
         types: [python]
         pass_filenames: false

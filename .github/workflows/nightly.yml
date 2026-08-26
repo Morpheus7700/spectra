@@ -88,11 +88,11 @@ jobs:
 
       - name: Lint (ruff)
         continue-on-error: true
-        run: uv run ruff check packages tools .claude/hooks
+        run: uv run ruff check packages tools adapters .claude/hooks
 
       - name: Types (mypy)
         continue-on-error: true
-        run: uv run mypy packages tools .claude/hooks
+        run: uv run mypy packages tools adapters .claude/hooks
 
       - name: Tests (excluding accuracy)
         continue-on-error: true

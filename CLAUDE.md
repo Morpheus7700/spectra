@@ -173,8 +173,8 @@ with `np.asarray` at the boundary. Type checking caught this; the tests did not.
 
 ```bash
 uv run pytest -q                                 # full suite
-uv run ruff check packages tools .claude/hooks   # lint
-uv run mypy packages tools .claude/hooks         # types (strict on source, tests exempt)
+uv run ruff check packages tools adapters .claude/hooks   # lint
+uv run mypy packages tools adapters .claude/hooks         # types (strict, tests exempt)
 uv run python -m tools.council "<q>" --adr "<slug>"
 ```
 
@@ -232,15 +232,24 @@ See `.claude/plans/lets-get-back-to-tranquil-storm.md`.
   plan view. At 3 m horizontal with 1.7 m height difference that is a 15% overstatement biasing
   near anchors outward. It vanishes at long range, which is why it is easy to miss.
 - **`netsh wlan show networks` is a broken instrument. Never measure with it.** It reported
-  **1** access point on the dev laptop where `wlanapi.dll` reported **16**. It serves a stale,
+  **1** access point on the dev laptop where `wlanapi.dll` reported **14 across three fresh
+  sweeps**, of which 6–9 are heard in any one sweep. It serves a stale,
   filtered cache and gives signal *percentage*, not dBm, so RSSI has to be reconstructed as
   `pct/2 - 100` — quantised to 2 dB, which is half the sigma budget of a good anchor thrown
   away for free. An entire session's conclusions ("no neighbour networks reachable at this
   location", and the pivot away from localisation that followed) were drawn from that artifact.
-  Use `adapters/windows_wlan/scanner.py`. A single sweep still under-reports — counts climbed
-  11 → 15 → 16 across consecutive sweeps because the radio visits channels in batches — so
-  union several.
-- **Count physical radios, not BSSIDs.** A 16-BSSID scan was ~8 devices. The 2.4/5 GHz radios
+  Use `adapters/windows_wlan/scanner.py`.
+- **`WlanGetNetworkBssList` is an accumulating cache, not a snapshot — filter by
+  `ullHostTimestamp` or the survey is fiction.** Six consecutive calls returned 13, 16, 19, 21,
+  22, 23 entries, climbing monotonically and never dropping. Carried-over entries keep a
+  byte-identical `lRssi` *and* timestamp: they were remembered, not re-measured, and one call
+  mixed readings spanning ~42 s. A stale entry is indistinguishable from a live one except by
+  its timestamp, so unfiltered it scores long-departed APs as perfectly persistent and averages
+  an RSSI the radio never took. Filtered to entries heard since the sweep was requested, the
+  honest count is **6–9 BSSIDs per sweep**, ~14 unioned over three sweeps. `ullHostTimestamp`
+  is a FILETIME (100 ns since 1601), verified against the system clock. An AP not heard this
+  sweep is a genuine non-detection and must read as absent, never as its last known value.
+- **Count physical radios, not BSSIDs.** A 14-BSSID union was ~8 devices. The 2.4/5 GHz radios
   of one box are the same anchor; a locally-administered BSSID differing only in the LA bit of
   the first octet is a virtual/guest BSS on the *same antenna*. Treating those as independent
   silently double-weights that radio in any k-NN metric or solve.

@@ -62,11 +62,16 @@ jobs:
       # 0.7s to learn about it instead of several minutes.
       # ---------------------------------------------------------------------
 
+      # adapters/ is included even though adapters/windows_wlan is Windows-only. It guards
+      # itself with a module-level `sys.platform != "win32"` raise, which mypy honours by
+      # treating the rest as unreachable on Linux, and its tests carry a skipif. So the
+      # Linux leg still lints and type-checks the parts it can reach rather than ignoring
+      # a whole package.
       - name: Lint (ruff)
-        run: uv run ruff check packages tools .claude/hooks
+        run: uv run ruff check packages tools adapters .claude/hooks
 
       - name: Types (mypy)
-        run: uv run mypy packages tools .claude/hooks
+        run: uv run mypy packages tools adapters .claude/hooks
 
       # Both tools/export_fixtures.py and apps/web/src/scene/SiteScene.tsx tell
       # the reader that "CI regenerates it and fails on any diff". Until now

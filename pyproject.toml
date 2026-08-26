@@ -28,7 +28,7 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["packages/core", "packages/engine", "packages/sim", "."]
-testpaths = ["packages", "tools", ".claude/hooks"]
+testpaths = ["packages", "tools", "adapters", ".claude/hooks"]
 filterwarnings = ["error"]
 # Registered here and applied in the same change, deliberately: filterwarnings = ["error"]
 # turns PytestUnknownMarkWarning into a hard failure, so a marker applied before it is
