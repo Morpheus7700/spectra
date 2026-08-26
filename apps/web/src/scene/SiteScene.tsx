@@ -4,6 +4,8 @@ import { useUi } from "../data/store";
 import type { SiteJson } from "../types/site";
 import { AccessPoints } from "./AccessPoints";
 import { FloorSlabs } from "./FloorSlabs";
+import { UncertaintyEllipsoids } from "./UncertaintyEllipsoids";
+import type { PositionEstimateWire } from "../types/wire";
 
 /**
  * Loads the site fixture and renders the building.
@@ -39,10 +41,30 @@ export function SiteScene() {
 
   if (!site) return null;
 
+  // For demonstration: M2 uncertainty volume (1-sigma ellipse)
+  const mockEstimates: PositionEstimateWire[] = [
+    {
+      tenant_id: "t-0",
+      target_id: "demo-target",
+      site_id: site.site_id,
+      estimated_at: new Date().toISOString(),
+      kind: "point",
+      x: 10.0,
+      y: 12.0,
+      covariance_xy: [[8.0, -3.0], [-3.0, 5.0]],
+      floor_id: site.floors[0]?.id ?? null,
+      floor_confidence: 1.0,
+      zone_id: null,
+      zone_confidence: 0.0,
+      downgrade_reason: null,
+    },
+  ];
+
   return (
     <group>
       <FloorSlabs site={site} />
       <AccessPoints site={site} />
+      <UncertaintyEllipsoids site={site} estimates={mockEstimates} />
     </group>
   );
 }

@@ -32,7 +32,8 @@ def ranges_to(
     error = error or {}
     return [
         RangeObservation(
-            anchor_x=ax, anchor_y=ay,
+            anchor_x=ax,
+            anchor_y=ay,
             distance_m=max(math.dist((ax, ay), truth) + error.get(i, 0.0), 0.0),
             sigma_m=sigma,
         )
@@ -158,9 +159,7 @@ def test_redundant_consistent_anchors_do_not_worsen_confidence():
     """Adding an anchor that agrees must never make the solver less certain."""
     truth = (7.0, 5.0)
     few, _ = solve(ranges_to(truth, anchors=WELL_SPREAD[:3], error={0: 1.0}))
-    many, _ = solve(
-        ranges_to(truth, anchors=[*WELL_SPREAD, (10.0, 7.5)], error={0: 1.0})
-    )
+    many, _ = solve(ranges_to(truth, anchors=[*WELL_SPREAD, (10.0, 7.5)], error={0: 1.0}))
     assert few is not None and many is not None
     assert many.sigma_m <= few.sigma_m * 1.05
 

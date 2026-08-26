@@ -73,6 +73,9 @@ def _exact_slant_observations(
         )
         observations.append(
             ObservationEvent(
+                tenant_id="t-0",
+                ingested_at=datetime.now(),
+                collection_policy="ephemeral",
                 observer_id=ap.id,
                 target_id="d1",
                 observed_at=NOW,
@@ -166,9 +169,7 @@ def test_device_height_reaches_the_slant_correction_and_the_default_is_the_right
     truth = (8.0, 9.0)
     observations = _exact_slant_observations(*truth, device_height_m=1.2)
 
-    default_error = math.dist(
-        _located(observations, PipelineConfig(models=EXACT_MODELS)), truth
-    )
+    default_error = math.dist(_located(observations, PipelineConfig(models=EXACT_MODELS)), truth)
     on_the_floor_error = math.dist(
         _located(observations, PipelineConfig(models=EXACT_MODELS, device_height_m=0.0)), truth
     )
@@ -188,6 +189,7 @@ def _wide_site() -> Site:
     a fix nobody should publish.
     """
     return Site(
+        tenant_id="t-0",
         id="wide-site",
         floors=(Floor(id="floor-0", level=0, elevation_m=0.0),),
         access_points=(
@@ -201,7 +203,14 @@ def _wide_site() -> Site:
 def _weak_observations() -> list[ObservationEvent]:
     return [
         ObservationEvent(
-            observer_id=ap_id, target_id="d1", observed_at=NOW, kind="rssi", value=rssi
+            tenant_id="t-0",
+            ingested_at=datetime.now(),
+            collection_policy="ephemeral",
+            observer_id=ap_id,
+            target_id="d1",
+            observed_at=NOW,
+            kind="rssi",
+            value=rssi,
         )
         for ap_id, rssi in (("ap-a", -85.0), ("ap-b", -88.0), ("ap-c", -86.0))
     ]

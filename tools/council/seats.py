@@ -84,9 +84,7 @@ class GeminiSeat(Seat):
         try:
             client = genai.Client(api_key=key)
             result = await asyncio.wait_for(
-                asyncio.to_thread(
-                    client.interactions.create, model=self.model, input=prompt
-                ),
+                asyncio.to_thread(client.interactions.create, model=self.model, input=prompt),
                 timeout=TIMEOUT_S,
             )
             text = (getattr(result, "output_text", "") or "").strip()
@@ -100,8 +98,17 @@ class GeminiSeat(Seat):
 # council with filesystem and shell access is a prompt-injection target, because stage 2
 # feeds it the *other vendors' raw output* as part of its prompt.
 _DENIED_TOOLS = [
-    "Bash", "Write", "Edit", "NotebookEdit", "Read", "Glob", "Grep",
-    "WebFetch", "WebSearch", "Task", "Agent",
+    "Bash",
+    "Write",
+    "Edit",
+    "NotebookEdit",
+    "Read",
+    "Glob",
+    "Grep",
+    "WebFetch",
+    "WebSearch",
+    "Task",
+    "Agent",
 ]
 
 # Environment variables never passed to the child. It authenticates by subscription login,
@@ -131,8 +138,10 @@ class ClaudeCliSeat(Seat):
             proc = await asyncio.create_subprocess_exec(
                 exe,
                 "-p",
-                "--permission-mode", "plan",
-                "--disallowed-tools", *_DENIED_TOOLS,
+                "--permission-mode",
+                "plan",
+                "--disallowed-tools",
+                *_DENIED_TOOLS,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,

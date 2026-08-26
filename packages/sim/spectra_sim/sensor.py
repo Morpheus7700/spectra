@@ -93,9 +93,12 @@ class Sensor:
                 continue
             events.append(
                 ObservationEvent(
+                    tenant_id=self.site.tenant_id,
                     observer_id=ap.id,
                     target_id=target_id,
                     observed_at=at,
+                    ingested_at=at,
+                    collection_policy="ephemeral",
                     kind="rssi",
                     value=rssi,
                 )

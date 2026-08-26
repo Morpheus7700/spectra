@@ -73,9 +73,7 @@ def classify_floor(
         return FloorVerdict(None, 0.0, (), reason="no observations from known access points")
 
     total = sum(weights.values())
-    scores = tuple(
-        sorted(((fid, w / total) for fid, w in weights.items()), key=lambda kv: -kv[1])
-    )
+    scores = tuple(sorted(((fid, w / total) for fid, w in weights.items()), key=lambda kv: -kv[1]))
     best_id, best_share = scores[0]
 
     if best_share < min_confidence:

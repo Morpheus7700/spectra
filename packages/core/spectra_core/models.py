@@ -26,6 +26,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Metres = Annotated[float, Field(allow_inf_nan=False)]
 Probability = Annotated[float, Field(ge=0.0, le=1.0)]
+type HashedTargetId = Annotated[str, Field(min_length=1)]
+CollectionPolicy = Literal["retain", "anonymize", "ephemeral"]
 
 
 class Frozen(BaseModel):
@@ -59,9 +61,12 @@ class ObservationEvent(Frozen):
     the ranging stage supplies a fitted default when it is absent.
     """
 
+    tenant_id: str = Field(min_length=1)
     observer_id: str = Field(min_length=1)
-    target_id: str = Field(min_length=1)
+    target_id: HashedTargetId
     observed_at: datetime
+    ingested_at: datetime
+    collection_policy: CollectionPolicy
     kind: ObservationKind
     value: float = Field(allow_inf_nan=False)
     variance: float | None = Field(default=None, ge=0.0)
@@ -120,12 +125,22 @@ class Zone(Frozen):
     polygon: tuple[tuple[float, float], ...] = Field(min_length=3)
 
 
+class Wall(Frozen):
+    """A partition that attenuates signals, defined by endpoints on a single floor."""
+
+    floor_id: str = Field(min_length=1)
+    a: tuple[Metres, Metres]
+    b: tuple[Metres, Metres]
+
+
 class Site(Frozen):
     id: str = Field(min_length=1)
+    tenant_id: str = Field(min_length=1)
     name: str = ""
     floors: tuple[Floor, ...] = Field(min_length=1)
     access_points: tuple[AccessPoint, ...] = ()
     zones: tuple[Zone, ...] = ()
+    walls: tuple[Wall, ...] = ()
 
     @model_validator(mode="after")
     def _check_referential_integrity(self) -> Self:
@@ -138,6 +153,9 @@ class Site(Frozen):
         for zone in self.zones:
             if zone.floor_id not in floor_ids:
                 raise ValueError(f"zone {zone.id!r} references unknown floor {zone.floor_id!r}")
+        for wall in self.walls:
+            if wall.floor_id not in floor_ids:
+                raise ValueError(f"wall references unknown floor {wall.floor_id!r}")
         return self
 
     def floor(self, floor_id: str) -> Floor:
@@ -169,9 +187,11 @@ class SolutionKind(StrEnum):
 
 
 class PositionEstimate(Frozen):
-    target_id: str = Field(min_length=1)
+    tenant_id: str = Field(min_length=1)
+    target_id: HashedTargetId
     site_id: str = Field(min_length=1)
     estimated_at: datetime
+    collection_policy: CollectionPolicy
     kind: SolutionKind
 
     x: Metres | None = None

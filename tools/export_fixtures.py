@@ -29,7 +29,6 @@ from spectra_core.models import Site  # noqa: E402
 from spectra_sim.building import (  # noqa: E402
     BuildingSpec,
     build_site,
-    interior_walls,
 )
 
 OUT_DIR = ROOT / "apps" / "web" / "public" / "fixtures"
@@ -41,7 +40,6 @@ def site_to_json(site: Site, spec: BuildingSpec) -> dict[str, Any]:
     Deliberately omits path-loss coefficients and anything else the client has no business
     knowing. The wire format is a projection of the domain model, not a dump of it.
     """
-    walls = interior_walls(spec)
     return {
         "schema": 1,
         "site_id": site.id,
@@ -78,11 +76,7 @@ def site_to_json(site: Site, spec: BuildingSpec) -> dict[str, Any]:
         ],
         # Walls are shared across floors in the generated building, but the client must not
         # assume that -- a real site has different partitions per storey.
-        "walls": [
-            {"floor_id": f.id, "a": list(seg[0]), "b": list(seg[1])}
-            for f in site.floors
-            for seg in walls
-        ],
+        "walls": [{"floor_id": w.floor_id, "a": list(w.a), "b": list(w.b)} for w in site.walls],
     }
 
 

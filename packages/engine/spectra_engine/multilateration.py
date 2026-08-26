@@ -98,12 +98,7 @@ def _linear_seed(anchors: np.ndarray, distances: np.ndarray) -> np.ndarray:
     """
     ref = anchors[0]
     a = 2.0 * (anchors[1:] - ref)
-    b = (
-        distances[0] ** 2
-        - distances[1:] ** 2
-        + np.sum(anchors[1:] ** 2, axis=1)
-        - np.sum(ref**2)
-    )
+    b = distances[0] ** 2 - distances[1:] ** 2 + np.sum(anchors[1:] ** 2, axis=1) - np.sum(ref**2)
     solution, *_ = np.linalg.lstsq(a, b, rcond=None)
     return np.asarray(solution, dtype=float)
 
@@ -138,9 +133,7 @@ def solve(
     if not np.all(np.isfinite(seed)):
         seed = anchors.mean(axis=0)
 
-    result = least_squares(
-        residuals, seed, jac=jacobian, loss="soft_l1", f_scale=1.0, max_nfev=200
-    )
+    result = least_squares(residuals, seed, jac=jacobian, loss="soft_l1", f_scale=1.0, max_nfev=200)
     if not result.success and result.status <= 0:
         return None, GeometryQuality.COLLINEAR_ANCHORS
 

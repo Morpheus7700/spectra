@@ -40,20 +40,14 @@ def load_dotenv() -> None:
 def next_adr_number() -> int:
     adr_dir = ROOT / "docs" / "adr"
     adr_dir.mkdir(parents=True, exist_ok=True)
-    used = [
-        int(m.group(1))
-        for p in adr_dir.glob("*.md")
-        if (m := re.match(r"(\d{4})-", p.name))
-    ]
+    used = [int(m.group(1)) for p in adr_dir.glob("*.md") if (m := re.match(r"(\d{4})-", p.name))]
     return max(used, default=0) + 1
 
 
 def write_adr(slug: str, result: CouncilResult) -> Path:
     number = next_adr_number()
     path = ROOT / "docs" / "adr" / f"{number:04d}-{slug}.md"
-    seats = "\n\n".join(
-        f"### {a.seat}\n\n{a.text}" for a in result.answers
-    )
+    seats = "\n\n".join(f"### {a.seat}\n\n{a.text}" for a in result.answers)
     agg = "\n".join(f"- {seat}: mean rank {rank}" for seat, rank in result.aggregate)
     parts = [
         f"# {number:04d}. {slug.replace('-', ' ').capitalize()}",
@@ -79,9 +73,14 @@ def write_adr(slug: str, result: CouncilResult) -> Path:
         seats,
     ]
     if result.debate:
-        parts += ["", "## Adversarial challenge", "",
-                  "_Consensus was strong enough to trigger a forced debate round._", "",
-                  result.debate]
+        parts += [
+            "",
+            "## Adversarial challenge",
+            "",
+            "_Consensus was strong enough to trigger a forced debate round._",
+            "",
+            result.debate,
+        ]
     if result.parse_failures:
         parts += ["", "## Ranking parse failures", ""]
         parts += [f"- {f}" for f in result.parse_failures]
@@ -118,8 +117,8 @@ async def amain() -> int:
     question = " ".join(args.question)
     seats = default_seats()
     rotate = os.environ.get("COUNCIL_ROTATE_CHAIR", "true").lower() != "false"
-    chair = args.chair if args.chair is not None else (
-        random.randrange(len(seats)) if rotate else 0
+    chair = (
+        args.chair if args.chair is not None else (random.randrange(len(seats)) if rotate else 0)
     )
     threshold = float(os.environ.get("COUNCIL_DEBATE_THRESHOLD", "0.8"))
 

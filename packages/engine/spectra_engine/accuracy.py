@@ -17,6 +17,7 @@ import statistics
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from spectra_core.models import ObservationEvent, Site, SolutionKind
 
@@ -168,7 +169,7 @@ def pooled(reports: Sequence[AccuracyReport]) -> AccuracyReport:
 
 
 def calibrate_from_truth(
-    paired: Sequence[tuple[object, Sequence[ObservationEvent]]],
+    paired: Sequence[tuple[Any, Sequence[ObservationEvent]]],
     site: Site,
     device_height_m: float = 1.2,
     min_samples: int = 6,
@@ -182,8 +183,8 @@ def calibrate_from_truth(
     """
     per_ap: dict[str, list[tuple[float, float]]] = {}
     for truth, observations in paired:
-        tx, ty = truth.x, truth.y  # type: ignore[attr-defined]
-        floor_id = truth.floor_id  # type: ignore[attr-defined]
+        tx, ty = truth.x, truth.y
+        floor_id = truth.floor_id
         elevation = site.floor(floor_id).elevation_m
         for obs in observations:
             if obs.kind not in ("rssi", "ble"):
@@ -210,7 +211,7 @@ def calibrate_from_truth(
 
 
 def evaluate(
-    paired: Sequence[tuple[object, Sequence[ObservationEvent]]],
+    paired: Sequence[tuple[Any, Sequence[ObservationEvent]]],
     site: Site,
     target_id: str,
     config: PipelineConfig | None = None,
@@ -222,21 +223,25 @@ def evaluate(
 
     for truth, observations in paired:
         result = estimate_position(
-            list(observations), site, truth.at, target_id, config  # type: ignore[attr-defined]
+            list(observations),
+            site,
+            truth.at,
+            target_id,
+            config,
         )
         est = result.estimate
         outcomes.append(Outcome(kind=est.kind, geometry=result.geometry))
 
         if est.floor_id is not None:
             floor_decided += 1
-            if est.floor_id == truth.floor_id:  # type: ignore[attr-defined]
+            if est.floor_id == truth.floor_id:
                 floor_correct += 1
 
         if est.kind is not SolutionKind.POINT:
             continue
         located += 1
         assert est.x is not None and est.y is not None
-        errors.append(math.dist((est.x, est.y), (truth.x, truth.y)))  # type: ignore[attr-defined]
+        errors.append(math.dist((est.x, est.y), (truth.x, truth.y)))
         sigma = est.horizontal_sigma_m
         if sigma is not None:
             sigmas.append(sigma)
@@ -244,7 +249,10 @@ def evaluate(
         if est.zone_id is not None:
             zone_decided += 1
             true_zone = zone_containing(
-                site, truth.floor_id, truth.x, truth.y  # type: ignore[attr-defined]
+                site,
+                truth.floor_id,
+                truth.x,
+                truth.y,
             )
             if true_zone is not None and est.zone_id == true_zone:
                 zone_correct += 1

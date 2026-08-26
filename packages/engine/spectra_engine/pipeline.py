@@ -57,11 +57,21 @@ def _slant_to_horizontal(slant_m: float, height_difference_m: float) -> float:
 
 
 def _unknown(
-    target_id: str, site_id: str, at: datetime, reason: str
+    target_id: str,
+    site_id: str,
+    at: datetime,
+    reason: str,
+    tenant_id: str,
+    collection_policy: str,
 ) -> PositionEstimate:
     return PositionEstimate(
-        target_id=target_id, site_id=site_id, estimated_at=at,
-        kind=SolutionKind.UNKNOWN, downgrade_reason=reason,
+        tenant_id=tenant_id,
+        target_id=target_id,
+        site_id=site_id,
+        estimated_at=at,
+        collection_policy=collection_policy,  # type: ignore[arg-type]
+        kind=SolutionKind.UNKNOWN,
+        downgrade_reason=reason,
     )
 
 
@@ -74,9 +84,14 @@ def estimate_position(
 ) -> PipelineResult:
     config = config or PipelineConfig()
 
+    tenant_id = site.tenant_id
+    collection_policy = observations[0].collection_policy if observations else "ephemeral"
+
     if not observations:
         return PipelineResult(
-            _unknown(target_id, site.id, at, "no observations in window"),
+            _unknown(
+                target_id, site.id, at, "no observations in window", tenant_id, collection_policy
+            ),
             FloorVerdict(None, 0.0, (), reason="no observations"),
             None,
         )
@@ -85,7 +100,14 @@ def estimate_position(
     verdict = classify_floor(observations, site, config.min_floor_confidence)
     if verdict.floor_id is None:
         return PipelineResult(
-            _unknown(target_id, site.id, at, verdict.reason or "floor undetermined"),
+            _unknown(
+                target_id,
+                site.id,
+                at,
+                verdict.reason or "floor undetermined",
+                tenant_id,
+                collection_policy,
+            ),
             verdict,
             None,
         )
@@ -93,9 +115,14 @@ def estimate_position(
     def downgrade(reason: str) -> PipelineResult:
         return PipelineResult(
             PositionEstimate(
-                target_id=target_id, site_id=site.id, estimated_at=at,
+                tenant_id=tenant_id,
+                target_id=target_id,
+                site_id=site.id,
+                estimated_at=at,
+                collection_policy=collection_policy,
                 kind=SolutionKind.ZONE_ONLY,
-                floor_id=verdict.floor_id, floor_confidence=verdict.confidence,
+                floor_id=verdict.floor_id,
+                floor_confidence=verdict.confidence,
                 observer_count=len(observations),
                 source_kinds=frozenset(o.kind for o in observations),
                 downgrade_reason=reason,
@@ -148,11 +175,19 @@ def estimate_position(
 
     return PipelineResult(
         PositionEstimate(
-            target_id=target_id, site_id=site.id, estimated_at=at,
+            tenant_id=tenant_id,
+            target_id=target_id,
+            site_id=site.id,
+            estimated_at=at,
+            collection_policy=collection_policy,
             kind=SolutionKind.POINT,
-            x=fix.x, y=fix.y, covariance_xy=fix.covariance,
-            floor_id=verdict.floor_id, floor_confidence=verdict.confidence,
-            zone_id=zone.zone_id, zone_confidence=zone.confidence,
+            x=fix.x,
+            y=fix.y,
+            covariance_xy=fix.covariance,
+            floor_id=verdict.floor_id,
+            floor_confidence=verdict.confidence,
+            zone_id=zone.zone_id,
+            zone_confidence=zone.confidence,
             observer_count=len(ranges),
             source_kinds=frozenset(o.kind for o in same_floor),
         ),

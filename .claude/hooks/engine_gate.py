@@ -27,7 +27,10 @@ def engine_is_dirty() -> bool:
     try:
         result = subprocess.run(
             ["git", "status", "--porcelain", "--", WATCHED],
-            capture_output=True, text=True, cwd=REPO, timeout=15,
+            capture_output=True,
+            text=True,
+            cwd=REPO,
+            timeout=15,
         )
     except Exception:
         return False
@@ -41,7 +44,10 @@ def main() -> int:
     try:
         result = subprocess.run(
             ["uv", "run", "pytest", "-q", "packages/engine", "-x", "--no-header"],
-            capture_output=True, text=True, cwd=REPO, timeout=600,
+            capture_output=True,
+            text=True,
+            cwd=REPO,
+            timeout=600,
         )
     except Exception as exc:
         sys.stderr.write(f"engine gate could not run: {type(exc).__name__}: {exc}\n")

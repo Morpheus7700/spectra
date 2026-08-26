@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from spectra_core.models import AccessPoint, Floor, Site, Vec3, Zone
+from spectra_core.models import AccessPoint, Floor, Site, Vec3, Wall, Zone
 
 from .propagation import Segment
 
@@ -115,8 +115,20 @@ def build_site(spec: BuildingSpec | None = None, site_id: str = "sim-site") -> S
         for ri, cy in enumerate(zone_ys)
     )
 
-    return Site(id=site_id, name="Simulated Office", floors=floors,
-                access_points=aps, zones=zones)
+    shared_walls = interior_walls(spec)
+    site_walls = tuple(
+        Wall(floor_id=floor.id, a=seg[0], b=seg[1]) for floor in floors for seg in shared_walls
+    )
+
+    return Site(
+        id=site_id,
+        tenant_id="sim-tenant",
+        name="Simulated Office",
+        floors=floors,
+        access_points=aps,
+        zones=zones,
+        walls=site_walls,
+    )
 
 
 def walls_by_floor(site: Site, spec: BuildingSpec) -> dict[str, tuple[Segment, ...]]:

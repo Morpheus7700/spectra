@@ -75,7 +75,5 @@ class ShadowingField:
         # Bilinear blending of unit normals shrinks the variance; rescale so the field
         # actually has the requested sigma rather than a quietly smaller one.
         blended = top * (1 - fy) + bottom * fy
-        weight = math.sqrt(
-            ((1 - fx) ** 2 + fx**2) * ((1 - fy) ** 2 + fy**2)
-        )
+        weight = math.sqrt(((1 - fx) ** 2 + fx**2) * ((1 - fy) ** 2 + fy**2))
         return self.sigma_db * blended / weight

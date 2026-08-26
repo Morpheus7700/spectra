@@ -213,4 +213,3 @@ def wide_open(seed: int = 0) -> Scenario:
         site,
         sensor,
     )
-

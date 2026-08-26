@@ -129,8 +129,12 @@ def test_allows_read_only_tools():
 
 def test_malformed_input_never_wedges_the_session():
     proc = subprocess.run(
-        [sys.executable, str(HOOK)], input="not json", capture_output=True,
-        text=True, cwd=REPO, timeout=30,
+        [sys.executable, str(HOOK)],
+        input="not json",
+        capture_output=True,
+        text=True,
+        cwd=REPO,
+        timeout=30,
     )
     assert proc.returncode == ALLOW
 

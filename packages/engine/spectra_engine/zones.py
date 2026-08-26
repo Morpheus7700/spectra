@@ -84,7 +84,8 @@ def resolve_zone(
     mass: dict[str, float] = {}
     for zone in zones:
         total = sum(
-            w for (px, py), w in zip(points, weights, strict=True)
+            w
+            for (px, py), w in zip(points, weights, strict=True)
             if point_in_polygon(px, py, zone.polygon)
         )
         if total > 0:

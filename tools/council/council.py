@@ -183,9 +183,9 @@ async def run_council(
         except RankingParseError as exc:
             failures.append(f"{review.seat}: {exc}")
 
-    aggregate = aggregate_ranks(rankings, label_to_seat) if rankings else [
-        (a.seat, 0.0) for a in answers
-    ]
+    aggregate = (
+        aggregate_ranks(rankings, label_to_seat) if rankings else [(a.seat, 0.0) for a in answers]
+    )
 
     # Optional debate round ------------------------------------------------
     debate: str | None = None
@@ -193,9 +193,7 @@ async def run_council(
         best_label = rankings[0][0]
         best = next(a for lab, a in zip(labels, answers, strict=True) if lab == best_label)
         devil = live[(chair_index + 1) % len(live)]
-        got = await devil.ask(
-            DEBATE_PROMPT.format(question=question, consensus=best.text)
-        )
+        got = await devil.ask(DEBATE_PROMPT.format(question=question, consensus=best.text))
         debate = got.text if got else None
 
     # Stage 3 -------------------------------------------------------------
@@ -207,9 +205,7 @@ async def run_council(
     agg_text = "\n".join(f"{seat}: {rank}" for seat, rank in aggregate) or "unavailable"
 
     final = await chair.ask(
-        SYNTH_PROMPT.format(
-            question=question, stage1=stage1, stage2=stage2, aggregate=agg_text
-        )
+        SYNTH_PROMPT.format(question=question, stage1=stage1, stage2=stage2, aggregate=agg_text)
     )
     if final is None:
         raise RuntimeError(f"chair {chair.name} failed to synthesise")

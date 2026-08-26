@@ -18,9 +18,7 @@ from spectra_engine.pipeline import PipelineConfig
 from spectra_sim.scenario import corridor_walk, sparse_grid, wide_open
 
 
-def _refusal_summary(
-    scenario_fn: object, seed: int = 0
-) -> dict[tuple[str, str | None], int]:
+def _refusal_summary(scenario_fn: object, seed: int = 0) -> dict[tuple[str, str | None], int]:
     """Run the calibrated pipeline over a scenario and return the refusal mix."""
     from spectra_sim.scenario import Scenario
 

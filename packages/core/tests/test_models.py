@@ -25,8 +25,17 @@ NOW = datetime(2026, 8, 20, 12, 0, tzinfo=UTC)
 
 def obs(**kw) -> ObservationEvent:
     return ObservationEvent(
-        **{"observer_id": "ap-1", "target_id": "dev-1", "observed_at": NOW,
-           "kind": "rssi", "value": -60.0, **kw}
+        **{
+            "tenant_id": "t-0",
+            "ingested_at": NOW,
+            "collection_policy": "ephemeral",
+            "observer_id": "ap-1",
+            "target_id": "dev-1",
+            "observed_at": NOW,
+            "kind": "rssi",
+            "value": -60.0,
+            **kw,
+        }
     )
 
 
@@ -74,11 +83,10 @@ def test_rejects_unknown_field():
 
 def _site(**kw) -> Site:
     base = {
+        "tenant_id": "t-0",
         "id": "site-1",
         "floors": (Floor(id="f1", level=1, elevation_m=0.0),),
-        "access_points": (
-            AccessPoint(id="ap-1", position=Vec3(x=0, y=0, z=2.8), floor_id="f1"),
-        ),
+        "access_points": (AccessPoint(id="ap-1", position=Vec3(x=0, y=0, z=2.8), floor_id="f1"),),
     }
     return Site(**{**base, **kw})
 
@@ -120,8 +128,14 @@ def test_access_point_rejects_non_positive_path_loss_exponent():
 
 def _point(**kw) -> PositionEstimate:
     base = {
-        "target_id": "dev-1", "site_id": "site-1", "estimated_at": NOW,
-        "kind": SolutionKind.POINT, "x": 3.0, "y": 4.0,
+        "tenant_id": "t-0",
+        "collection_policy": "ephemeral",
+        "target_id": "dev-1",
+        "site_id": "site-1",
+        "estimated_at": NOW,
+        "kind": SolutionKind.POINT,
+        "x": 3.0,
+        "y": 4.0,
         "covariance_xy": ((4.0, 0.0), (0.0, 1.0)),
     }
     return PositionEstimate(**{**base, **kw})
@@ -165,8 +179,14 @@ def test_sigma_is_the_major_axis_of_the_uncertainty_ellipse():
 
 def test_sigma_is_none_without_a_covariance():
     est = PositionEstimate(
-        target_id="d", site_id="s", estimated_at=NOW, kind=SolutionKind.ZONE_ONLY,
-        floor_id="f1", downgrade_reason="only 2 observers",
+        tenant_id="t-0",
+        collection_policy="ephemeral",
+        target_id="d",
+        site_id="s",
+        estimated_at=NOW,
+        kind=SolutionKind.ZONE_ONLY,
+        floor_id="f1",
+        downgrade_reason="only 2 observers",
     )
     assert est.horizontal_sigma_m is None
 
@@ -177,30 +197,54 @@ def test_sigma_is_none_without_a_covariance():
 def test_zone_only_estimate_must_not_carry_coordinates():
     with pytest.raises(ValidationError, match="must not carry coordinates"):
         PositionEstimate(
-            target_id="d", site_id="s", estimated_at=NOW, kind=SolutionKind.ZONE_ONLY,
-            x=1.0, y=2.0, floor_id="f1", downgrade_reason="collinear anchors",
+            tenant_id="t-0",
+            collection_policy="ephemeral",
+            target_id="d",
+            site_id="s",
+            estimated_at=NOW,
+            kind=SolutionKind.ZONE_ONLY,
+            x=1.0,
+            y=2.0,
+            floor_id="f1",
+            downgrade_reason="collinear anchors",
         )
 
 
 def test_downgraded_estimate_must_record_a_reason():
     with pytest.raises(ValidationError, match="silent downgrade"):
         PositionEstimate(
-            target_id="d", site_id="s", estimated_at=NOW,
-            kind=SolutionKind.ZONE_ONLY, floor_id="f1",
+            tenant_id="t-0",
+            collection_policy="ephemeral",
+            target_id="d",
+            site_id="s",
+            estimated_at=NOW,
+            kind=SolutionKind.ZONE_ONLY,
+            floor_id="f1",
         )
 
 
 def test_unknown_estimate_cannot_claim_a_floor():
     with pytest.raises(ValidationError, match="cannot claim a floor"):
         PositionEstimate(
-            target_id="d", site_id="s", estimated_at=NOW, kind=SolutionKind.UNKNOWN,
-            floor_id="f1", downgrade_reason="no observations",
+            tenant_id="t-0",
+            collection_policy="ephemeral",
+            target_id="d",
+            site_id="s",
+            estimated_at=NOW,
+            kind=SolutionKind.UNKNOWN,
+            floor_id="f1",
+            downgrade_reason="no observations",
         )
 
 
 def test_valid_unknown_estimate():
     est = PositionEstimate(
-        target_id="d", site_id="s", estimated_at=NOW, kind=SolutionKind.UNKNOWN,
+        tenant_id="t-0",
+        collection_policy="ephemeral",
+        target_id="d",
+        site_id="s",
+        estimated_at=NOW,
+        kind=SolutionKind.UNKNOWN,
         downgrade_reason="no observations in window",
     )
     assert est.floor_id is None and est.zone_confidence == 0.0

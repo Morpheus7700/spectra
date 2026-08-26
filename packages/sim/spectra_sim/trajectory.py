@@ -85,7 +85,10 @@ class Trajectory:
                 out.append(
                     GroundTruth(
                         at=self.start + timedelta(seconds=next_sample),
-                        x=x, y=y, floor_id=floor, is_stationary=stationary,
+                        x=x,
+                        y=y,
+                        floor_id=floor,
+                        is_stationary=stationary,
                     )
                 )
                 next_sample += self.sample_interval_s
@@ -102,8 +105,10 @@ class Trajectory:
                 break
             a = wp
             b = self.waypoints[index + 1]
-            leg_s = self.floor_change_s if a.floor_id != b.floor_id else (
-                math.dist((a.x, a.y), (b.x, b.y)) / self.speed_ms
+            leg_s = (
+                self.floor_change_s
+                if a.floor_id != b.floor_id
+                else (math.dist((a.x, a.y), (b.x, b.y)) / self.speed_ms)
             )
             changing_floor = a.floor_id != b.floor_id
             leg_start = t
@@ -130,8 +135,11 @@ class Trajectory:
         if not out or (out[-1].x, out[-1].y) != (last.x, last.y):
             out.append(
                 GroundTruth(
-                    at=self.start + timedelta(seconds=t), x=last.x, y=last.y,
-                    floor_id=last.floor_id, is_stationary=True,
+                    at=self.start + timedelta(seconds=t),
+                    x=last.x,
+                    y=last.y,
+                    floor_id=last.floor_id,
+                    is_stationary=True,
                 )
             )
         return out

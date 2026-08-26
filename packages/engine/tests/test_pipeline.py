@@ -23,7 +23,14 @@ SITE = build_site(BuildingSpec())
 
 def obs(ap_id: str, rssi: float) -> ObservationEvent:
     return ObservationEvent(
-        observer_id=ap_id, target_id="d1", observed_at=NOW, kind="rssi", value=rssi
+        tenant_id="t-0",
+        ingested_at=datetime.now(),
+        collection_policy="ephemeral",
+        observer_id=ap_id,
+        target_id="d1",
+        observed_at=NOW,
+        kind="rssi",
+        value=rssi,
     )
 
 
@@ -96,18 +103,14 @@ def test_strong_same_floor_signals_decide_the_floor():
 
 def test_weak_cross_floor_signals_do_not_override():
     observations = [obs(ap, -50.0) for ap in _floor0_aps()]
-    observations += [
-        obs(ap.id, -85.0) for ap in SITE.access_points if ap.floor_id == "floor-1"
-    ]
+    observations += [obs(ap.id, -85.0) for ap in SITE.access_points if ap.floor_id == "floor-1"]
     assert classify_floor(observations, SITE).floor_id == "floor-0"
 
 
 def test_voting_uses_linear_power_not_decibels():
     # Summing dBm is meaningless. One AP at -50 dBm outweighs three at -70 dBm, because
     # it is 100x the power; naive dB summing would get this backwards.
-    f0, f1 = _floor0_aps()[0], [
-        ap.id for ap in SITE.access_points if ap.floor_id == "floor-1"
-    ][:3]
+    f0, f1 = _floor0_aps()[0], [ap.id for ap in SITE.access_points if ap.floor_id == "floor-1"][:3]
     verdict = classify_floor([obs(f0, -50.0)] + [obs(a, -70.0) for a in f1], SITE)
     assert verdict.floor_id == "floor-0"
 

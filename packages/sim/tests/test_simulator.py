@@ -130,8 +130,7 @@ def test_shadowing_is_spatially_correlated():
     # must yield a stable bias, so nearby points must agree closely.
     f = ShadowingField(seed=11, correlation_length_m=5.0)
     near = [
-        abs(f.value("ap-1", x, 0.0) - f.value("ap-1", x + 0.2, 0.0))
-        for x in (0.0, 7.3, 21.9, 40.1)
+        abs(f.value("ap-1", x, 0.0) - f.value("ap-1", x + 0.2, 0.0)) for x in (0.0, 7.3, 21.9, 40.1)
     ]
     far = [
         abs(f.value("ap-1", x, 0.0) - f.value("ap-1", x + 25.0, 0.0))
@@ -164,7 +163,8 @@ def test_rejects_non_positive_correlation_length():
 def test_walk_duration_follows_distance_over_speed():
     t = Trajectory(
         waypoints=(Waypoint(x=0, y=0, floor_id="f"), Waypoint(x=13.5, y=0, floor_id="f")),
-        start=NOW, speed_ms=1.35,
+        start=NOW,
+        speed_ms=1.35,
     )
     assert t.duration_s() == pytest.approx(10.0)
 
@@ -175,7 +175,8 @@ def test_pauses_extend_the_duration():
             Waypoint(x=0, y=0, floor_id="f", pause_s=4.0),
             Waypoint(x=13.5, y=0, floor_id="f"),
         ),
-        start=NOW, speed_ms=1.35,
+        start=NOW,
+        speed_ms=1.35,
     )
     assert t.duration_s() == pytest.approx(14.0)
 
@@ -183,7 +184,9 @@ def test_pauses_extend_the_duration():
 def test_interpolates_position_along_a_leg():
     t = Trajectory(
         waypoints=(Waypoint(x=0, y=0, floor_id="f"), Waypoint(x=10, y=0, floor_id="f")),
-        start=NOW, speed_ms=1.0, sample_interval_s=1.0,
+        start=NOW,
+        speed_ms=1.0,
+        sample_interval_s=1.0,
     )
     samples = t.samples()
     assert samples[0].x == pytest.approx(0.0)
@@ -193,7 +196,8 @@ def test_interpolates_position_along_a_leg():
 def test_stationary_samples_are_flagged():
     t = Trajectory(
         waypoints=(Waypoint(x=1, y=1, floor_id="f", pause_s=3.0),),
-        start=NOW, sample_interval_s=1.0,
+        start=NOW,
+        sample_interval_s=1.0,
     )
     assert all(s.is_stationary for s in t.samples())
 
@@ -201,7 +205,9 @@ def test_stationary_samples_are_flagged():
 def test_floor_change_holds_horizontal_position_and_flips_floor():
     t = Trajectory(
         waypoints=(Waypoint(x=5, y=5, floor_id="f0"), Waypoint(x=5, y=5, floor_id="f1")),
-        start=NOW, sample_interval_s=1.0, floor_change_s=8.0,
+        start=NOW,
+        sample_interval_s=1.0,
+        floor_change_s=8.0,
     )
     samples = t.samples()
     assert {(s.x, s.y) for s in samples} == {(5.0, 5.0)}
