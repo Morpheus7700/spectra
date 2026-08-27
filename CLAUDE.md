@@ -202,10 +202,24 @@ PARTIAL · domain-model changes NOT DONE. The accuracy marker and gate tests hav
 the rest has not been re-verified. `docs/specs/` is advertised at the top of this file and is
 an empty directory.
 
-**Now: P1-Real** — localisation on the hardware that exists (one Windows laptop, two routers in
-one flat). The laptop is both sensor and target; it is the only thing this hardware can locate.
-Device-free sensing is permanently out here: no CSI on AX211/Windows, no FTM on Windows at all.
-See `.claude/plans/lets-get-back-to-tranquil-storm.md`.
+**Now: P1-Real** — ship the platform against the hardware that exists: one fixed Windows
+desktop, one router, no additions possible.
+
+Three questions were asked and answered by measurement, in this order. Each closed a door:
+
+1. *Can we locate the receiver?* No — one anchor, and a desktop that cannot be carried to
+   survey points. Fingerprinting needs a mobile receiver; multilateration needs three anchors.
+2. *Can we sense a person device-free?* No. **ADR 0002.** Two channels, six feature families,
+   a positive control and a drift control. The channel wanders further on its own in five
+   minutes than a human body moves it.
+3. *What can this hardware honestly show?* **Range, not position.** With one receiver each AP
+   sits on a shell of radius `d ± σ` centred on the PC. Shells are the deliverable; a point
+   would be the plausible-looking number R8 forbids.
+
+So the product is two views over one engine: a **live RF view** of what this hardware really
+measures (~14 radios, true dBm, ~3 Hz, honest shells and visible refusals), and the
+**simulated building** showing what the same engine does when real infrastructure exists
+(P0-validated multilateration). R13 keeps their figures in separate tables, always.
 
 ## Standing findings
 
