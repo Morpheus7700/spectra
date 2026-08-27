@@ -262,6 +262,50 @@ See `.claude/plans/lets-get-back-to-tranquil-storm.md`.
   where fading helped — truncation that biases the mean upward by 1.4–4.8 dB and shortens
   fitted range by 10–31%. The bias is deterministic, so averaging never removes it and a robust
   loss never catches it. Binary seen/not-seen only; never a continuous feature, never an anchor.
+- **There is exactly one anchor, and the deployment cannot move.** The dev machine is a
+  desktop; the flat has one router (OUI `AC:10:07`, Arcadyan — an ISP ODM box). The other
+  strong SSID is a neighbour's (`AC:15:A2`, TP-Link). Its 2.4/5 GHz BSSIDs and the
+  locally-administered variant sharing the last four octets are **one radio at one location**.
+  With one anchor and no mobile receiver, fingerprinting and multilateration are both out;
+  R8 requires refusal, not a plausible number.
+- **Windows sensing-channel inventory, measured on AX211 (do not re-derive):**
+  `WlanGetNetworkBssList` 0.25 Hz (needs a scan, location-gated) · `wlan_intf_opcode_rssi`
+  (0x10000102) **0 Hz — unchanged across 1787 polls and 2801 injected packets** ·
+  `realtime_connection_quality` (opcode 19, real dBm, *not* location-gated) **0.10 Hz** ·
+  `ulRxRate`/`wlanSignalQuality` ~0.1 Hz · **`wlan_intf_opcode_statistics` (0x10000101)
+  19.5 Hz.** The RSSI opcodes are the trap: they return true dBm, so they look like the
+  obvious sensing channel while responding to nothing. Only the statistics counters
+  (`ullRetryCount`, `ullACKFailureCount`) move fast enough to sense anything, and they need
+  injected traffic because an idle machine transmits almost nothing.
+- **No FTM on Windows, ever** — Microsoft states there is no API and no public plan. CSI is
+  also unavailable: no Windows path exists for Intel, and no monitor mode on Intel+Windows.
+  Whether the **AX211 can do CSI on Linux is genuinely unresolved** — FeitCSI's driver fork
+  contains the AX211 device IDs (`0x51F0/0x51F1/0x7AF0`) mapped to the AX210 config and the
+  CSI path is gated on a firmware capability bit with no device check, but nobody has
+  published a success or failure. One agent argued CNVio2 makes it architecturally impossible.
+  Settle it in one evening with the FeitCSI live USB: does
+  `/sys/kernel/debug/iwlwifi/*/iwlmvm/csi_enabled` exist and do chunks arrive?
+- **Device-free sensing: use the associated link only.** Djukić et al. (arXiv 2308.06773)
+  measured it — transmitter *inside* the room gives ~100% binary presence; transmitter
+  *outside* collapses to **45–72% for one person**. Every neighbour link crosses their flat
+  first, so their motion is indistinguishable from ours without geometry we do not have. It is
+  also a motion sensor aimed into homes that did not consent (R15/R18). The best-performing,
+  only confound-free, and only ethical stream are the same stream.
+- **Variance over a window is the feature; the mean of RSSI is not.** Djukić and Ichnaea
+  converge on it independently. A body both reflects (raising RSSI) and absorbs (lowering it)
+  depending where it stands, so there is no one-way effect on the mean — a feature set built
+  on mean shift trains beautifully and fails in deployment. Skew and kurtosis: also
+  non-discriminating.
+- **Room-level device-free classification is out with one receiver.** Every link shares one
+  endpoint, so it is a fan, not a mesh; radio tomography is ill-posed for any voxel no link
+  crosses. WiFi's 20–40 MHz bandwidth also caps range resolution at 7.5–15 m, larger than a
+  flat, so room-level can never come from ranging — only from learned fingerprints. Expect
+  35–60% same-day for 4–6 rooms and near-chance across days. **A second receiver (one ESP32)
+  converts the fan into a mesh and is the highest value-per-rupee change available.**
+- **Never split device-free data randomly.** RSSI-family signals are heavily autocorrelated;
+  windows from one recording leak across a random split and report 80–95% for a detector that
+  learned nothing. Split by session, ideally by day, and recalibrate the quiet baseline
+  nightly — the idle floor drifted from 0.115 to 0.23 in fifteen minutes here.
 - **Prefer differential features (RSSI_i − RSSI_j) to raw dBm.** Cancels common-mode NIC gain
   drift, laptop lid angle, and part of body shadowing. Costs nothing.
 - **Body orientation is not a second-order effect.** 3–6 dB typical shadowing, 10–20 dB worst
