@@ -123,9 +123,13 @@ def cohens_d(a: Sequence[float], b: Sequence[float]) -> float:
         return 0.0
     va, vb = statistics.variance(a), statistics.variance(b)
     pooled = math.sqrt(((len(a) - 1) * va + (len(b) - 1) * vb) / (len(a) + len(b) - 2))
+    difference = statistics.fmean(b) - statistics.fmean(a)
     if pooled == 0.0:
-        return 0.0
-    return (statistics.fmean(b) - statistics.fmean(a)) / pooled
+        # No spread within either group. Equal means is genuinely no effect; unequal means is
+        # perfect separation, which is infinite -- not zero. Returning zero here would let a
+        # quantised metric that happens to be constant within each half hide a total drift.
+        return 0.0 if difference == 0.0 else math.copysign(math.inf, difference)
+    return difference / pooled
 
 
 def best_threshold(quiet: Sequence[float], active: Sequence[float]) -> tuple[float, float, float]:
@@ -145,6 +149,35 @@ def best_threshold(quiet: Sequence[float], active: Sequence[float]) -> tuple[flo
         if tpr - fpr > best_score:
             best_score, best = tpr - fpr, (candidate, tpr, fpr)
     return best
+
+
+def drift_floor(windows: Sequence[Window], metric: str) -> float:
+    """How large an effect this metric produces from nothing at all.
+
+    Splits each single-label session in half by time and measures the effect size *between
+    its own halves*. Nobody changed behaviour in the middle of a recording, so whatever this
+    returns is manufactured by drift, and a between-label effect that does not clear it is
+    manufactured the same way.
+
+    This control exists because the tool twice reported a confident win that was drift. On the
+    link channel a d of -0.41 was two sessions rising in the same shape. On the rssi channel a
+    d of +0.93 was a 1.04 dB between-label difference sitting inside a 1.91 dB within-session
+    swing -- the quiet recording wandered further on its own than the walking effect did.
+    """
+    worst = 0.0
+    for session, label in sorted({(w.session, w.label) for w in windows}):
+        group = [
+            w
+            for w in windows
+            if w.session == session and w.label == label and metric in w.stats
+        ]
+        if len(group) < 4:
+            continue
+        half = len(group) // 2
+        first = [w.stats[metric] for w in group[:half]]
+        second = [w.stats[metric] for w in group[half:]]
+        worst = max(worst, abs(cohens_d(first, second)))
+    return worst
 
 
 def extract_windows(
@@ -307,18 +340,26 @@ def _compare(path: Path, channel: str) -> None:
         print("\nNo metric is present in both labels -- nothing comparable.")
         return
 
-    print(f"\n{'metric':<24} {'d':>7}  {'threshold':>10} {'TPR':>7} {'FPR':>7}")
-    print("-" * 60)
-    scored: list[tuple[float, str]] = []
+    print(f"\n{'metric':<24} {'d':>7} {'drift':>7} {'net':>7}  {'TPR':>6} {'FPR':>6}")
+    print("-" * 62)
+    scored: list[tuple[float, str, float, float]] = []
     for metric in metrics:
         q = [w.stats[metric] for w in quiet if metric in w.stats]
         a = [w.stats[metric] for w in active if metric in w.stats]
         d = cohens_d(q, a)
-        threshold, tpr, fpr = best_threshold(q, a)
-        scored.append((abs(d), metric))
-        print(f"{metric:<24} {d:>+7.2f}  {threshold:>10.3f} {tpr:>6.0%} {fpr:>7.0%}")
+        floor = drift_floor(windows, metric)
+        net = abs(d) - floor
+        _, tpr, fpr = best_threshold(q, a)
+        scored.append((net, metric, abs(d), floor))
+        print(
+            f"{metric:<24} {d:>+7.2f} {floor:>7.2f} {net:>+7.2f}  {tpr:>5.0%} {fpr:>6.0%}"
+        )
 
-    effect, name = max(scored)
+    net_effect, name, effect, floor = max(scored)
+    print(
+        "\n'drift' is the same effect size measured between the two halves of a single\n"
+        "recording, where nothing changed. 'net' is what survives it."
+    )
 
     if len(quiet) < MIN_WINDOWS_PER_LABEL or len(active) < MIN_WINDOWS_PER_LABEL:
         needed_s = MIN_WINDOWS_PER_LABEL * FEATURE_WINDOW_S
@@ -337,16 +378,28 @@ def _compare(path: Path, channel: str) -> None:
             "before believing them."
         )
 
-    if effect < USABLE_EFFECT_SIZE:
+    if effect >= USABLE_EFFECT_SIZE and net_effect < USABLE_EFFECT_SIZE:
         print(
-            f"\nVERDICT: best metric '{name}' gives |d| = {effect:.2f}, below "
-            f"{USABLE_EFFECT_SIZE}.\n"
-            "The distributions overlap too much for a single-window detector. That is the\n"
-            "result, not a tuning problem."
+            f"\nVERDICT: DRIFT, not detection. Best metric '{name}' gives |d| = {effect:.2f},\n"
+            f"which clears the {USABLE_EFFECT_SIZE} bar -- but the same metric produces "
+            f"{floor:.2f}\n"
+            "between the two halves of a single recording, where nobody changed anything.\n"
+            "The channel wanders further on its own than the person moves it. Reporting this\n"
+            "as a detector would be exactly the plausible-looking number R8 forbids."
+        )
+    elif net_effect < USABLE_EFFECT_SIZE:
+        print(
+            f"\nVERDICT: best metric '{name}' gives |d| = {effect:.2f} against a drift floor "
+            f"of {floor:.2f},\n"
+            f"leaving {net_effect:+.2f} -- below {USABLE_EFFECT_SIZE}. The distributions "
+            "overlap too much for a\n"
+            "single-window detector. That is the result, not a tuning problem."
         )
     else:
         print(
-            f"\nVERDICT: best metric '{name}' gives |d| = {effect:.2f}. Something is visible.\n"
+            f"\nVERDICT: '{name}' gives |d| = {effect:.2f} against a drift floor of "
+            f"{floor:.2f}.\n"
+            f"Net {net_effect:+.2f} survives. Something is genuinely visible.\n"
             "Binary motion is the shippable claim. It does NOT generalise to *where* -- one\n"
             "receiver is a fan, not a mesh (R8)."
         )

@@ -104,3 +104,41 @@ def test_a_sparse_metric_is_dropped_rather_than_imputed() -> None:
 def test_a_window_with_no_usable_metric_is_omitted_entirely() -> None:
     lonely = [Sample("still", "s1", "rssi", 0.0, {"aa:bb:cc:dd:ee:ff": -60.0})]
     assert extract_windows(lonely, window_s=20.0) == []
+
+
+def _windows(label: str, session: str, values: list[float]) -> list:
+    from tools.sense import Window
+
+    return [
+        Window(label=label, session=session, channel="rssi", stats={"m": v}) for v in values
+    ]
+
+
+def test_drift_floor_catches_a_ramp_inside_one_recording() -> None:
+    """Nobody changed behaviour mid-recording, so any effect between its halves is drift."""
+    from tools.sense import drift_floor
+
+    ramp = _windows("still", "s1", [1.0, 1.0, 1.0, 1.0, 5.0, 5.0, 5.0, 5.0])
+    assert drift_floor(ramp, "m") > 1.0
+
+
+def test_drift_floor_is_near_zero_for_a_stationary_recording() -> None:
+    from tools.sense import drift_floor
+
+    flat = _windows("still", "s1", [1.0, 1.1, 0.9, 1.0, 1.05, 0.95, 1.0, 1.0])
+    assert drift_floor(flat, "m") < 0.8
+
+
+def test_drift_floor_ignores_groups_too_small_to_split() -> None:
+    from tools.sense import drift_floor
+
+    assert drift_floor(_windows("still", "s1", [1.0, 9.0]), "m") == 0.0
+
+
+def test_drift_floor_reports_the_worst_group_not_the_average() -> None:
+    """One drifting session is enough to make a between-label effect untrustworthy."""
+    from tools.sense import drift_floor
+
+    windows = _windows("still", "quiet", [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+    windows += _windows("walking", "drifty", [1.0, 1.0, 1.0, 1.0, 6.0, 6.0, 6.0, 6.0])
+    assert drift_floor(windows, "m") > 1.0
