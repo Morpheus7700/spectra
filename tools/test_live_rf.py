@@ -26,7 +26,7 @@ def _snapshot(readings: list[Reading], own: str | None = OWN_5) -> dict[str, obj
 
 
 def _reading(
-    bssid: str, rssi: float, *, ssid: str = "Roy", band: float = 5.0, age: float = 0.5
+    bssid: str, rssi: float, *, ssid: str = "HomeNet", band: float = 5.0, age: float = 0.5
 ) -> Reading:
     return Reading(bssid=bssid, ssid=ssid, rssi_dbm=rssi, band_ghz=band, age_s=age)
 
@@ -88,7 +88,7 @@ def test_no_raw_bssid_and_no_neighbour_ssid_reaches_the_wire() -> None:
         [
             _reading(OWN_24, -48.0, band=2.4),
             _reading(OWN_5, -57.0),
-            _reading(NEIGHBOUR, -70.0, ssid="Guest", band=2.4),
+            _reading(NEIGHBOUR, -70.0, ssid="Guest-2G", band=2.4),
             _reading("c2:00:00:11:cf:85", -88.0, ssid="Guest-2G", band=2.4),
         ]
     )
@@ -96,8 +96,8 @@ def test_no_raw_bssid_and_no_neighbour_ssid_reaches_the_wire() -> None:
     for bssid in (OWN_24, OWN_5, NEIGHBOUR, "c2:00:00:11:cf:85"):
         assert bssid not in wire
         assert bssid.replace(":", "") not in wire
-    assert "guest" not in wire
-    assert "roy" in wire  # the user's own network is theirs to see
+    assert "guest-2g" not in wire  # a neighbour's network name must never reach the browser
+    assert "homenet" in wire  # the user's own network is theirs to see
 
 
 def test_median_smoothing_rejects_a_fading_dropout() -> None:

@@ -18,7 +18,7 @@ def radio_key(bssid: str) -> tuple[str, ...]:
     """Identity of the physical radio behind a BSSID. Equal keys mean one antenna.
 
     One box presents several BSSIDs: its 2.4 and 5 GHz radios differ only in the last octet
-    (`…af:32:a0` / `…af:32:a1`), and a guest or mesh BSS differs only in the
+    (`…:32:a0` / `…:32:a1`), and a guest or mesh BSS differs only in the
     locally-administered bit of the first (`ac:…` / `ae:…`). Counting those as independent
     manufactures phantom anchors at zero baseline and double-weights one radio in any k-NN
     metric -- the degenerate geometry R8 exists to catch, arriving disguised as a good fix.
@@ -26,8 +26,8 @@ def radio_key(bssid: str) -> tuple[str, ...]:
     So: the last two octets, with the low two bits of the final one masked.
 
     That is looser than it looks like it should be, and the looseness is measured rather than
-    chosen. A stricter key over the last *four* octets correctly pairs `…af:32:a0` with
-    `…af:32:a1`, but fails on an observed neighbour box whose guest BSS derives from
+    chosen. A stricter key over the last *four* octets correctly pairs `…:32:a0` with
+    `…:32:a1`, but fails on an observed neighbour box whose guest BSS derives from
     `c0:00:00:10:cf:85` as `c2:00:00:11:cf:85` -- changing octet 3 as well as the
     locally-administered bit. Vendors do not agree on a derivation rule, so matching the tail
     is the only thing that holds across them.

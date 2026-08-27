@@ -3,7 +3,7 @@
     uv run python -m tools.live_rf
 
 **What this can and cannot produce.** There is one receiver (this PC, fixed) and one known
-anchor (the router in the flat, presenting `…af:32:a0` on 2.4 GHz and `…af:32:a1` on 5 GHz --
+anchor (the router in the flat, presenting `…32:a0` on 2.4 GHz and `…:32:a1` on 5 GHz --
 one physical radio, two BSSIDs). Every other radio in range is a neighbour's box at an unknown
 position. One receiver and one anchor do not determine a position: RSSI gives a *range*, and a
 range from a single point is a sphere. So the output is a set of shells -- "this AP is

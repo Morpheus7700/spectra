@@ -68,8 +68,8 @@ def test_same_radio_candidates_are_grouped() -> None:
     """Both real collapses: a 2.4/5 GHz pair, and a guest BSS on the same antenna."""
     groups = candidate_radio_groups(
         [
-            "d8:aa:00:01:32:a0",  # Roy 2.4 GHz  \  one box
-            "d8:aa:00:01:32:a1",  # Roy 5 GHz    /
+            "d8:aa:00:01:32:a0",  # own 2.4 GHz  \  one box
+            "d8:aa:00:01:32:a1",  # own 5 GHz    /
             "c0:00:00:10:cf:85",  # box B 2.4    \
             "c0:00:00:10:cf:84",  # box B 5 GHz   > one box, three BSSIDs
             "c2:00:00:11:cf:85",  # guest BSS    /

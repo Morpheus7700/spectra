@@ -76,3 +76,13 @@ apps/web/public/live.json
 .swarm/
 fc/
 fcapp/
+
+# Personal session transcripts and local tool state -- never publish
+*claude session*.txt
+.claude/proven-config.json
+.claude/.proven-config-version
+
+# Personal session transcripts and local tool state -- never publish
+*claude session*.txt
+.claude/proven-config.json
+.claude/.proven-config-version
