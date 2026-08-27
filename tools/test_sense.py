@@ -58,3 +58,33 @@ def test_threshold_reports_false_positives_it_cannot_avoid() -> None:
 def test_threshold_on_empty_input_claims_nothing() -> None:
     assert best_threshold([], [0.1, 0.2]) == (0.0, 0.0, 0.0)
     assert best_threshold([0.1, 0.2], []) == (0.0, 0.0, 0.0)
+
+
+def test_feature_windows_never_span_sessions_or_labels() -> None:
+    """A window straddling the moment the person started walking belongs to neither label."""
+    from tools.sense import SenseRow, extract_features
+
+    def row(label: str, session: str, at: float) -> SenseRow:
+        return SenseRow(
+            label=label, session=session, at=at, duration_s=0.25,
+            transmitted=100, received=100, retries=12, ack_failures=25,
+        )
+
+    rows = [row("still", "s1", t * 0.25) for t in range(160)]
+    rows += [row("walking", "s1", 40.0 + t * 0.25) for t in range(160)]
+    rows += [row("still", "s2", t * 0.25) for t in range(160)]
+
+    features = extract_features(rows, window_s=20.0)
+    assert {(f.session, f.label) for f in features} == {
+        ("s1", "still"), ("s1", "walking"), ("s2", "still"),
+    }
+    for f in features:
+        assert f.retry_mean == pytest.approx(0.12)
+
+
+def test_a_single_sample_cannot_produce_a_variance() -> None:
+    """One sample has no spread; emitting 0.0 would claim a stability it never measured."""
+    from tools.sense import SenseRow, extract_features
+
+    lonely = [SenseRow("still", "s1", 0.0, 0.25, 100, 100, 12, 25)]
+    assert extract_features(lonely, window_s=20.0) == []
