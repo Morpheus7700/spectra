@@ -48,9 +48,11 @@ if sys.platform != "win32":  # pragma: no cover - the adapter is Windows-only by
     raise ImportError("adapters.windows_wlan.link requires Windows (wlanapi.dll)")
 
 from adapters.windows_wlan.scanner import (
+    DOT11_SSID,
     GUID,
     WLAN_INTERFACE_INFO_LIST,
     _check,
+    _format_bssid,
     _wlanapi,
 )
 
@@ -181,6 +183,86 @@ class _Prober(threading.Thread):
 
     def stop(self) -> None:
         self._stop.set()
+
+
+class _ASSOCIATION_ATTRIBUTES(Structure):
+    _fields_ = (
+        ("dot11Ssid", DOT11_SSID),
+        ("dot11BssType", ctypes.c_int),
+        ("dot11Bssid", ctypes.c_ubyte * 6),
+        ("dot11PhyType", ctypes.c_int),
+        ("uDot11PhyIndex", ctypes.c_ulong),
+        ("wlanSignalQuality", ctypes.c_ulong),
+        ("ulRxRate", ctypes.c_ulong),
+        ("ulTxRate", ctypes.c_ulong),
+    )
+
+
+class _SECURITY_ATTRIBUTES(Structure):
+    _fields_ = (
+        ("bSecurityEnabled", ctypes.c_int),
+        ("bOneXEnabled", ctypes.c_int),
+        ("dot11AuthAlgorithm", ctypes.c_int),
+        ("dot11CipherAlgorithm", ctypes.c_int),
+    )
+
+
+class WLAN_CONNECTION_ATTRIBUTES(Structure):
+    _fields_ = (
+        ("isState", ctypes.c_int),
+        ("wlanConnectionMode", ctypes.c_int),
+        ("strProfileName", ctypes.c_wchar * 256),
+        ("wlanAssociationAttributes", _ASSOCIATION_ATTRIBUTES),
+        ("wlanSecurityAttributes", _SECURITY_ATTRIBUTES),
+    )
+
+
+WLAN_INTF_OPCODE_CURRENT_CONNECTION = 7
+
+
+def associated_bssid() -> str:
+    """The BSSID we are actually connected to -- i.e. the one radio inside this home.
+
+    This is what makes the privacy rule enforceable in code rather than by memory (R15): the
+    sensing path filters to radios sharing this BSSID's last four octets, so a neighbour's
+    router cannot enter the collection path even by accident. R15 is explicit that mode must
+    branch the *collection*, not the display.
+    """
+    negotiated = DWORD()
+    handle = HANDLE()
+    _check(_wlanapi.WlanOpenHandle(2, None, byref(negotiated), byref(handle)), "WlanOpenHandle")
+    try:
+        iface_list = POINTER(WLAN_INTERFACE_INFO_LIST)()
+        _check(_wlanapi.WlanEnumInterfaces(handle, None, byref(iface_list)), "WlanEnumInterfaces")
+        try:
+            if iface_list.contents.dwNumberOfItems == 0:
+                raise OSError("no WLAN interface present")
+            guid = iface_list.contents.InterfaceInfo[0].InterfaceGuid
+        finally:
+            _wlanapi.WlanFreeMemory(iface_list)
+
+        size = DWORD()
+        data = c_void_p()
+        value_type = ctypes.c_int()
+        _check(
+            _wlanapi.WlanQueryInterface(
+                handle,
+                byref(guid),
+                WLAN_INTF_OPCODE_CURRENT_CONNECTION,
+                None,
+                byref(size),
+                byref(data),
+                byref(value_type),
+            ),
+            "WlanQueryInterface(current_connection)",
+        )
+        try:
+            conn = ctypes.cast(data, POINTER(WLAN_CONNECTION_ATTRIBUTES)).contents
+            return _format_bssid(conn.wlanAssociationAttributes.dot11Bssid)
+        finally:
+            _wlanapi.WlanFreeMemory(data)
+    finally:
+        _wlanapi.WlanCloseHandle(handle, None)
 
 
 def default_gateway() -> str:

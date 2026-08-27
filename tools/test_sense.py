@@ -1,15 +1,15 @@
 """The separability maths has to be honest in both directions.
 
-An effect-size function that flatters overlapping distributions, or a threshold sweep that
-optimises accuracy on unbalanced classes, would let this project claim a detector it does
-not have. These pin both.
+An effect-size function that flatters overlapping distributions, a threshold sweep that
+optimises accuracy on unbalanced classes, or a window that imputes a reading nobody took --
+each would let this project claim a detector it does not have.
 """
 
 from __future__ import annotations
 
 import pytest
 
-from tools.sense import best_threshold, cohens_d
+from tools.sense import Sample, best_threshold, cohens_d, extract_windows
 
 
 def test_identical_distributions_have_no_effect() -> None:
@@ -38,19 +38,14 @@ def test_degenerate_inputs_do_not_fabricate_an_effect() -> None:
 
 
 def test_threshold_separates_cleanly_separable_classes() -> None:
-    quiet = [0.10, 0.11, 0.12]
-    active = [0.50, 0.51, 0.52]
-    threshold, tpr, fpr = best_threshold(quiet, active)
-    assert tpr == 1.0
-    assert fpr == 0.0
+    threshold, tpr, fpr = best_threshold([0.10, 0.11, 0.12], [0.50, 0.51, 0.52])
+    assert (tpr, fpr) == (1.0, 0.0)
     assert 0.12 < threshold <= 0.50
 
 
 def test_threshold_reports_false_positives_it_cannot_avoid() -> None:
     """Overlapping classes must surface a non-zero FPR, never hide it."""
-    quiet = [0.10, 0.20, 0.30, 0.40]
-    active = [0.25, 0.35, 0.45, 0.55]
-    _, tpr, fpr = best_threshold(quiet, active)
+    _, tpr, fpr = best_threshold([0.10, 0.20, 0.30, 0.40], [0.25, 0.35, 0.45, 0.55])
     assert tpr > 0.0
     assert fpr > 0.0
 
@@ -60,31 +55,52 @@ def test_threshold_on_empty_input_claims_nothing() -> None:
     assert best_threshold([0.1, 0.2], []) == (0.0, 0.0, 0.0)
 
 
-def test_feature_windows_never_span_sessions_or_labels() -> None:
-    """A window straddling the moment the person started walking belongs to neither label."""
-    from tools.sense import SenseRow, extract_features
-
-    def row(label: str, session: str, at: float) -> SenseRow:
-        return SenseRow(
-            label=label, session=session, at=at, duration_s=0.25,
-            transmitted=100, received=100, retries=12, ack_failures=25,
+def _samples(label: str, session: str, n: int, start: float = 0.0) -> list[Sample]:
+    return [
+        Sample(
+            label=label,
+            session=session,
+            channel="rssi",
+            at=start + i * 0.33,
+            values={"aa:bb:cc:dd:ee:ff": -60.0 + (i % 3)},
         )
+        for i in range(n)
+    ]
 
-    rows = [row("still", "s1", t * 0.25) for t in range(160)]
-    rows += [row("walking", "s1", 40.0 + t * 0.25) for t in range(160)]
-    rows += [row("still", "s2", t * 0.25) for t in range(160)]
 
-    features = extract_features(rows, window_s=20.0)
-    assert {(f.session, f.label) for f in features} == {
-        ("s1", "still"), ("s1", "walking"), ("s2", "still"),
+def test_windows_never_span_sessions_or_labels() -> None:
+    """A window straddling the moment the person started walking belongs to neither label."""
+    rows = _samples("still", "s1", 120)
+    rows += _samples("walking", "s1", 120, start=60.0)
+    rows += _samples("still", "s2", 120)
+
+    windows = extract_windows(rows, window_s=20.0)
+    assert {(w.session, w.label) for w in windows} == {
+        ("s1", "still"),
+        ("s1", "walking"),
+        ("s2", "still"),
     }
-    for f in features:
-        assert f.retry_mean == pytest.approx(0.12)
+    for w in windows:
+        assert "aa:bb:cc:dd:ee:ff.mean" in w.stats
+        assert "aa:bb:cc:dd:ee:ff.sd" in w.stats
 
 
-def test_a_single_sample_cannot_produce_a_variance() -> None:
-    """One sample has no spread; emitting 0.0 would claim a stability it never measured."""
-    from tools.sense import SenseRow, extract_features
+def test_a_sparse_metric_is_dropped_rather_than_imputed() -> None:
+    """An AP heard twice in a window is a non-detection the rest of the time. Filling that in
+    would invent readings the radio never took."""
+    rows = _samples("still", "s1", 60)
+    rows[0] = Sample(
+        label="still",
+        session="s1",
+        channel="rssi",
+        at=rows[0].at,
+        values={"aa:bb:cc:dd:ee:ff": -60.0, "11:22:33:44:55:66": -80.0},
+    )
+    windows = extract_windows(rows, window_s=20.0)
+    assert windows
+    assert all("11:22:33:44:55:66.mean" not in w.stats for w in windows)
 
-    lonely = [SenseRow("still", "s1", 0.0, 0.25, 100, 100, 12, 25)]
-    assert extract_features(lonely, window_s=20.0) == []
+
+def test_a_window_with_no_usable_metric_is_omitted_entirely() -> None:
+    lonely = [Sample("still", "s1", "rssi", 0.0, {"aa:bb:cc:dd:ee:ff": -60.0})]
+    assert extract_windows(lonely, window_s=20.0) == []

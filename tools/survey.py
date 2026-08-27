@@ -25,11 +25,13 @@ from __future__ import annotations
 import json
 import statistics
 import sys
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
+
+from adapters.bssid import candidate_radio_groups
 
 DEFAULT_CAPTURE = Path("data/flat/survey.jsonl")
 ORIENTATIONS: tuple[str, ...] = ("N", "E", "S", "W")
@@ -132,28 +134,6 @@ def screen(records: Sequence[SweepRecord]) -> list[BssidQuality]:
             )
         )
     return sorted(out, key=lambda q: q.mean_dbm, reverse=True)
-
-
-def candidate_radio_groups(bssids: Iterable[str]) -> list[list[str]]:
-    """Group BSSIDs that are probably the same physical radio.
-
-    A 16-BSSID scan was ~8 devices: the 2.4/5 GHz radios of one box differ only in the last
-    octet, and a virtual/guest BSS differs only in the locally-administered bit of the first.
-    Treating those as independent double-weights that radio in any k-NN metric or solve.
-
-    # ponytail: matches on the last two octets with the final octet's low 2 bits masked.
-    # Cheap and catches every case in the observed scan, but it can false-positive across
-    # unrelated vendors, so this returns *candidates* for a human to confirm -- it never
-    # merges anything itself. Upgrade to OUI lookup + beacon-IE correlation if it misfires.
-    """
-    groups: dict[tuple[str, int], list[str]] = {}
-    for bssid in bssids:
-        octets = bssid.split(":")
-        if len(octets) != 6:
-            continue
-        key = (octets[4].lower(), int(octets[5], 16) & 0xFC)
-        groups.setdefault(key, []).append(bssid)
-    return [sorted(g) for g in groups.values() if len(g) > 1]
 
 
 def _load(path: Path) -> list[SweepRecord]:
