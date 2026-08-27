@@ -57,3 +57,16 @@ tools/council/transcripts/
 
 # CI scratch
 accuracy-output.txt
+
+# FeitCSI clones (Linux CSI toolchain), kept locally for the AX211-CSI experiment.
+# Nested git repos with their own .env -- never absorb them into this tree.
+/fc/
+/fcapp/
+
+# FeitCSI clones (Linux CSI toolchain), kept locally for the AX211-CSI experiment.
+# Nested git repos with their own .env -- never absorb them into this tree.
+/fc/
+/fcapp/
+
+# Live snapshot -- regenerated each run, and it encodes the real radio environment.
+apps/web/public/live.json
