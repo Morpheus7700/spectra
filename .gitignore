@@ -70,3 +70,9 @@ accuracy-output.txt
 
 # Live snapshot -- regenerated each run, and it encodes the real radio environment.
 apps/web/public/live.json
+
+# Agent tooling scratch
+.claude-flow/
+.swarm/
+fc/
+fcapp/
