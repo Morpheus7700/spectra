@@ -214,13 +214,20 @@ def build_snapshot(
             }
         )
 
+    # Plain language on purpose: this file is read by a panel a non-technical person sees.
+    # The engineering caveats (uncalibrated A/n, R8 refusals) are real, but said in words.
     notes = [
-        "One receiver: each AP is somewhere on a shell of that radius, not at a point.",
-        "Ranges are uncalibrated -- no ground truth here to fit A and n against, so sigma "
-        "is wide on purpose.",
+        "One antenna can only measure distance, not direction, so each router is a whole "
+        "sphere around this computer rather than a dot.",
+        "WiFi distance is rough, so every sphere is a best guess -- the fuzzier it looks, "
+        "the less sure it is.",
     ]
     if refusals:
-        notes.append(f"{len(refusals)} radio(s) refused this sweep rather than guessed at.")
+        word = "router" if len(refusals) == 1 else "routers"
+        notes.append(
+            f"{len(refusals)} {word} were too faint to place honestly, so they were left "
+            "out rather than guessed."
+        )
 
     return {
         "measured_at": measured_at.isoformat(),
@@ -246,11 +253,23 @@ def write_atomic(path: Path, payload: dict[str, Any]) -> None:
 
     The renderer polls this file at whatever rate it likes; without the rename the browser
     would occasionally parse a truncated object and blank the scene for a frame.
+
+    Windows makes the rename fragile in a way POSIX does not: while the dev server or the
+    browser has the destination open to serve it, `os.replace` raises PermissionError
+    (WinError 5). The lock is held only for the length of a read, so a few short retries clear
+    it. If they do not, the temp file is removed and this sweep is skipped rather than left as
+    litter -- the next sweep is a second away and publishes fresher data anyway.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    os.replace(tmp, path)
+    for attempt in range(5):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            time.sleep(0.05 * (attempt + 1))
+    tmp.unlink(missing_ok=True)
 
 
 def main(seconds: float | None = None) -> int:

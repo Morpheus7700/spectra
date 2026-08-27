@@ -25,13 +25,13 @@ export function LivePanel({ feed }: { feed: LiveFeedLike }) {
   return (
     <aside className="rf-panel">
       <header className="rf-panel__head">
-        <div className="rf-panel__title">RF ENVIRONMENT</div>
+        <div className="rf-panel__title">NEARBY WIFI</div>
         <StatusDot status={status} detail={detail} ageSeconds={ageSeconds} />
       </header>
 
       {snapshot && (
         <div className="rf-panel__observer">
-          {snapshot.observer.label} · {snapshot.observer.band_note}
+          Heard by {snapshot.observer.label} · {snapshot.observer.band_note}
         </div>
       )}
 
@@ -45,7 +45,7 @@ export function LivePanel({ feed }: { feed: LiveFeedLike }) {
       {snapshot && snapshot.shells.length > 0 && (
         <section>
           <h2 className="rf-panel__label">
-            Shells<span>{snapshot.shells.length}</span>
+            Routers placed<span>{snapshot.shells.length}</span>
           </h2>
           <ul className="rf-rows">
             {snapshot.shells.map((shell) => (
@@ -58,16 +58,11 @@ export function LivePanel({ feed }: { feed: LiveFeedLike }) {
       {snapshot && snapshot.refusals.length > 0 && (
         <section>
           <h2 className="rf-panel__label rf-panel__label--refused">
-            Refused<span>{snapshot.refusals.length}</span>
+            Too weak to place<span>{snapshot.refusals.length}</span>
           </h2>
-          <ul className="rf-rows">
-            {snapshot.refusals.map((r) => (
-              <li key={r.id} className="rf-refusal">
-                <span className="rf-refusal__id">{r.id.slice(0, 4)}</span>
-                <span className="rf-refusal__reason">{r.reason}</span>
-              </li>
-            ))}
-          </ul>
+          <p className="rf-refusal-note">
+            Heard, but too faint for an honest distance — set aside rather than guessed.
+          </p>
         </section>
       )}
 
@@ -100,19 +95,34 @@ function ShellRow({ shell, onHover }: { shell: LiveShell; onHover: (id: string |
       <span className="rf-row__swatch" style={{ background: color }} aria-hidden />
       <div className="rf-row__body">
         <div className="rf-row__top">
-          <span className="rf-row__label">{shell.label}</span>
-          <span className="rf-row__rssi">{shell.rssi_dbm} dBm</span>
+          <span className="rf-row__label">{shell.own ? "Your WiFi" : shell.label}</span>
+          <SignalBars rssi={shell.rssi_dbm} />
         </div>
         <div className="rf-row__range">
-          <span className="rf-row__dist">{shell.range_m.toFixed(1)} m</span>
-          <span className="rf-row__pm">± {shell.sigma_m.toFixed(1)}</span>
+          <span className="rf-row__dist">
+            {shell.range_m.toFixed(1)}<span className="rf-row__unit">m away</span>
+          </span>
+          <span className="rf-row__pm">give or take {shell.sigma_m.toFixed(1)}</span>
           <span className="rf-row__band">{bandLabel(shell.band_ghz)}</span>
         </div>
         {swamped && (
-          <div className="rf-row__flag">uncertainty exceeds range — could be anywhere within</div>
+          <div className="rf-row__flag">so faint it could be right here, or much further</div>
         )}
       </div>
     </li>
+  );
+}
+
+function SignalBars({ rssi }: { rssi: number }) {
+  // The universal WiFi-bars mnemonic instead of a dBm number nobody outside the field reads.
+  // -50 and up is full; -90 and below is one bar. Four bars over that range.
+  const filled = Math.max(1, Math.min(4, Math.round((rssi + 92) / 11)));
+  return (
+    <span className="rf-bars" title={`${rssi} dBm`} aria-label={`signal ${filled} of 4`}>
+      {[0, 1, 2, 3].map((i) => (
+        <span key={i} className={`rf-bars__b${i < filled ? " is-on" : ""}`} />
+      ))}
+    </span>
   );
 }
 

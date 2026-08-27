@@ -130,3 +130,79 @@ canvas { display: block; touch-action: none; }
 
 .rf-panel::-webkit-scrollbar { width: 8px; }
 .rf-panel::-webkit-scrollbar-thumb { background: var(--rf-line-bright); border-radius: 4px; }
+
+/* ── plain-language layer ─────────────────────────────────────────────────── */
+
+.intro-scrim {
+  position: absolute; inset: 0; z-index: 40;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  background: radial-gradient(ellipse at center, rgba(4,7,10,0.55), rgba(4,7,10,0.8));
+  backdrop-filter: blur(3px);
+  animation: intro-fade 260ms ease;
+}
+@keyframes intro-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.intro-card {
+  width: min(540px, 100%);
+  padding: 30px 32px 26px;
+  background: linear-gradient(180deg, #0c151b, #080e12);
+  border: 1px solid var(--rf-line-bright); border-radius: 18px;
+  box-shadow: 0 40px 90px -30px #000, 0 0 0 1px rgba(138,255,200,0.04);
+  color: var(--rf-ink);
+  font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+.intro-eyebrow {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.24em;
+  text-transform: uppercase; color: var(--rf-own); margin-bottom: 12px;
+}
+.intro-title {
+  margin: 0 0 12px; font-size: 27px; line-height: 1.15; font-weight: 650;
+  letter-spacing: -0.01em; color: #eafff6;
+}
+.intro-lede { margin: 0 0 20px; font-size: 15px; line-height: 1.55; color: #b7cad2; }
+.intro-lede strong, .intro-points strong { color: var(--rf-ink); font-weight: 640; }
+
+.intro-points { list-style: none; margin: 0 0 20px; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.intro-points li { display: flex; gap: 13px; font-size: 14px; line-height: 1.5; color: #a9bcc5; }
+.intro-points em { color: #cfe0e7; font-style: italic; }
+.intro-key { flex: 0 0 16px; height: 16px; margin-top: 2px; border-radius: 5px; }
+.intro-key--own { background: var(--rf-own); box-shadow: 0 0 12px rgba(138,255,200,0.6); }
+.intro-key--ring { background: transparent; border: 2px solid #62cdff; }
+.intro-key--fuzz {
+  background: radial-gradient(circle, rgba(247,168,60,0.55), rgba(247,168,60,0));
+  border-radius: 50%;
+}
+
+.intro-foot { margin: 0 0 22px; font-size: 12.5px; line-height: 1.55; color: var(--rf-dim); }
+
+.intro-go {
+  padding: 11px 26px; border: 0; border-radius: 9px; cursor: pointer;
+  background: var(--rf-own); color: #052015; font-size: 14px; font-weight: 650;
+  font-family: inherit; transition: transform 100ms ease, box-shadow 150ms ease;
+}
+.intro-go:hover { transform: translateY(-1px); box-shadow: 0 10px 26px -12px var(--rf-own); }
+.intro-go:focus-visible { outline: 2px solid #eafff6; outline-offset: 2px; }
+
+.intro-chip {
+  position: absolute; left: 16px; bottom: 16px; z-index: 15;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border: 1px solid var(--rf-line-bright); border-radius: 999px;
+  background: var(--rf-panel); color: var(--rf-ink); cursor: pointer;
+  font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13px;
+  backdrop-filter: blur(10px); transition: border-color 120ms ease, color 120ms ease;
+}
+.intro-chip::before { content: "?"; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--rf-own); color: #052015; font-weight: 700; font-size: 11px; }
+.intro-chip:hover { border-color: var(--rf-own); }
+
+/* ── signal bars, replacing raw dBm in each row ── */
+.rf-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 13px; }
+.rf-bars > span { width: 3px; background: #2b4049; border-radius: 1px; }
+.rf-bars__b0 { height: 4px; } .rf-bars__b1 { height: 7px; }
+.rf-bars__b2 { height: 10px; } .rf-bars__b3 { height: 13px; }
+.rf-bars > span.is-on { background: var(--rf-dim); }
+.rf-row--own .rf-bars > span.is-on { background: var(--rf-own); }
+
+.rf-row__unit { font-size: 11px; color: var(--rf-dim); margin-left: 3px; letter-spacing: 0; }
+.rf-refusal-note { margin: 0 0 16px; padding: 0 2px; font-size: 11px; line-height: 1.5; color: var(--rf-dim); }
+
+@media (prefers-reduced-motion: reduce) { .intro-scrim { animation: none; } .intro-go:hover { transform: none; } }

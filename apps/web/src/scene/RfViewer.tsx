@@ -25,11 +25,13 @@ export function RfViewer({ snapshot }: { snapshot: LiveSnapshot | null }) {
     return Math.max(max, 8); // never frame tighter than the innermost few metres
   }, [shells]);
 
-  const cam = extent * 1.7;
+  const cam = extent * 1.9;
 
   return (
     <Canvas
-      camera={{ position: [cam, cam * 0.72, cam], fov: 45, near: 0.1, far: extent * 12 }}
+      // Oblique and high enough that the shells read as spheres, not flat rings: a level
+      // camera collapses every sphere to a circle and throws away the whole 3D premise.
+      camera={{ position: [cam, cam * 1.15, cam * 0.85], fov: 45, near: 0.1, far: extent * 14 }}
       gl={{ antialias: true }}
     >
       <color attach="background" args={["#06090c"]} />

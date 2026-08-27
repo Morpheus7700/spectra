@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { useLive } from "../data/useLive";
+import { IntroCard } from "../ui/IntroCard";
 import { LivePanel } from "../ui/LivePanel";
 import type { LiveFeedLike } from "../ui/livePanelTypes";
 import { RfViewer } from "./RfViewer";
@@ -35,6 +36,7 @@ export function RfView() {
     <>
       <RfViewer snapshot={feed.snapshot} />
       <LivePanel feed={panelFeed} />
+      <IntroCard />
     </>
   );
 }
