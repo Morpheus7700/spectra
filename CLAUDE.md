@@ -1,7 +1,7 @@
 # Spectra — WiFi 3D Spatial Awareness Platform
 
 Locate objects in 3D within a WiFi network's range. Installable PWA + website from one build.
-Enterprise target: IT / facilities. Design: `docs/specs/` · Decisions: `docs/adr/`
+Enterprise target: IT / facilities. Decisions: `docs/adr/`
 
 ---
 
@@ -199,8 +199,8 @@ p50 3.34 m (R14a), so 2.61 m there would be a ~0.7 m win, not the result it look
 
 **P0.5 was never closed.** Recorded as: accuracy gate PARTIAL · refusal paths PARTIAL · CI
 PARTIAL · domain-model changes NOT DONE. The accuracy marker and gate tests have since landed;
-the rest has not been re-verified. `docs/specs/` is advertised at the top of this file and is
-an empty directory.
+the rest has not been re-verified. There is no `docs/specs/` — the design that exists is in
+`docs/adr/` and in this file.
 
 **Now: P1-Real** — ship the platform against the hardware that exists: one fixed Windows
 desktop, one router, no additions possible.
